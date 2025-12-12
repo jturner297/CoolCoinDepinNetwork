@@ -73,8 +73,9 @@ Cool-Coin is a proof-of-concept Decentralized Physical Infrastructure Network (D
 - Update fetch calls to validator IP.
 - Generate Wallet 2:
   ```bash
-  python wallet_generation.py
+  python3 wallet_generation.py
 - Test transfer:
   ```bash
-  python transfer.py
+  python3 transfer.py
+
 

@@ -1,7 +1,7 @@
 # Cool-Coin DePIN Network
 
- <p align="left">
-  <img src="CoolCoinLogo.png" alt="CoolCoin thumbnail" width="300">
+ <p align="center">
+  <img src="CoolCoinLogo2.png" alt="CoolCoin thumbnail" width="400">
 </p>
 
 ## Project Overview

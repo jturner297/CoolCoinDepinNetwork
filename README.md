@@ -1,7 +1,7 @@
 # Cool-Coin DePIN Network
 
- <p align="center">
-  <img src="CoolCoinThumbnail.png" alt="CoolCoin thumbnail" width="200">
+ <p align="left">
+  <img src="CoolCoinLogo.png" alt="CoolCoin thumbnail" width="300">
 </p>
 
 ## Project Overview
@@ -77,5 +77,3 @@ Cool-Coin is a proof-of-concept Decentralized Physical Infrastructure Network (D
 - Test transfer:
   ```bash
   python3 transfer.py
-
-

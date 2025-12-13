@@ -1,6 +1,6 @@
 
  <p align="center">
-  <img src="CoolCoinLogo2.png" alt="CoolCoin thumbnail" width="700">
+  <img src="CoolCoinLogo2.png" alt="CoolCoin thumbnail" width="512">
 </p>
 
 ---
@@ -77,4 +77,5 @@ Cool-Coin is a proof-of-concept Decentralized Physical Infrastructure Network (D
 - Test transfer:
   ```bash
   python3 transfer.py
+
 

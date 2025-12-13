@@ -57,7 +57,8 @@ Cool-Coin is a proof-of-concept Decentralized Physical Infrastructure Network (D
 - Run ipconfig to find server IP
 
 ### 2. Miner Setup (On Pi)
-- Install dependencies:  
+- Install dependencies:
+  ```bash
   pip install adafruit-circuitpython-bme280 requests cryptography
 - Generate the miner's wallet:
   ```bash
@@ -77,6 +78,7 @@ Cool-Coin is a proof-of-concept Decentralized Physical Infrastructure Network (D
 - Test transfer:
   ```bash
   python3 transfer.py
+
 
 
 

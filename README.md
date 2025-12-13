@@ -1,6 +1,6 @@
 
  <p align="center">
-  <img src="CoolCoinLogo2.png" alt="CoolCoin thumbnail" width="400">
+  <img src="_resources/CoolCoinLogo2.png" alt="CoolCoin thumbnail" width="400">
 </p>
 
 ---

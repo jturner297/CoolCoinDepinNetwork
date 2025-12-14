@@ -1,0 +1,15 @@
+# ---- Sensitive keys ----
+*.pem
+*.pub
+
+# ---- Runtime / generated data ----
+*.json
+*.csv
+
+# ---- Python cache ----
+__pycache__/
+*.pyc
+
+# ---- OS junk ----
+.DS_Store
+Thumbs.db

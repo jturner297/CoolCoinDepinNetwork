@@ -77,7 +77,7 @@ with open("miner_wallet.pub", "rb") as f:          # open the public key file
 # ----------------------------------------------------------
 # Validator server
 # ----------------------------------------------------------
-server_url = "http://192.168.137.2:8000/submit_tx"  # FastAPI endpoint (used to submit the transaction)
+server_url = "http://192.168.1.1:8000/submit_tx"  # FastAPI endpoint (used to submit the transaction)
 
 
 

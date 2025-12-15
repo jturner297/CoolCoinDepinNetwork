@@ -47,38 +47,155 @@ bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c)  # initialize the sensor with 
 bme280.sea_level_pressure = 1013.25            # optional calibration for altitude calculations (unused)
 
 
-# ----------------------------------------------------------
-# Load the wallet keys
-# 
-# These come from:
-#   Generating private key with this command: 
-#       openssl genpkey -algorithm Ed25519 -out miner_wallet.pem
-#   
-#   Extracting matching public key with this command: 
-#       openssl pkey -in miner_wallet.pem -pubout -out miner_wallet.pub
-#
-#   PEM formatting was used in keys because it works perfect with
-#   Python's cryptography library
-# ----------------------------------------------------------
+WALLET_DIR = os.path.join("..", "shared", "wallets")  # points to ../shared/wallets               # all wallets stored here
+CONFIG_FILE = "miner_config.json"
+# --------------------
+# Function definitions
+# --------------------
+
+def load_wallet(wallet_name):
+    """
+    Load the private and public keys for a given wallet name.
+    Exits the program if the wallet does not exist or the name is empty.
+    Returns: private_key, public_key_pem, private_key_path, public_key_path
+    """
+
+    # Make sure the wallet name is not empty
+    if not wallet_name:
+        print("Wallet name cannot be empty. Exiting...") 
+        exit(1)
+
+    # construct full paths to private/public keys
+    private_key_path = os.path.join(WALLET_DIR, f"{wallet_name}.pem")
+    public_key_path  = os.path.join(WALLET_DIR, f"{wallet_name}.pub")
+
+    # Wallet Existence Check 
+    if not os.path.exists(private_key_path) or not os.path.exists(public_key_path):
+        print(f"Wallet '{wallet_name}' does not exist!")
+        print(f"Make sure {private_key_path} and {public_key_path} exist.")
+        exit(1)
+
+    # load private key
+    with open(private_key_path, "rb") as f:              # open the private key file
+        private_key = serialization.load_pem_private_key(
+            f.read(),                               # read the file contents
+            password=None                           # no password on the key
+        )
+
+    # load public key
+    with open(public_key_path, "rb") as f:         # open the public key file
+        public_key_pem = f.read().decode().strip() # store the text version for JSON output (turn into normat text bytes)
+
+    print(f"Loaded wallet '{wallet_name}' successfully!")
+
+    return private_key, public_key_pem, private_key_path, public_key_path
+
+def load_or_init_config(config_file=CONFIG_FILE):
+    """
+    Load server config and wallet name from JSON.
+    If the file doesn't exist or entries are missing, prompt the user and save.
+    Returns: server_ip, server_port, server_url, wallet_name
+    """
+    first_run = not os.path.exists(config_file)
+
+    if not first_run:
+        with open(config_file, "r") as f:
+            config = json.load(f)
+    else:
+        config = {}
+
+    server_ip = config.get("server_ip")
+    server_port = config.get("server_port")
+    wallet_name = config.get("wallet_name")
+
+    if first_run:
+        print("="*50)
+        print(" " * 16 + "Miner Setup")
+        print("="*50)
 
 
- # load private key
-with open("miner_wallet.pem", "rb") as f:          # open the private key file
-    private_key = serialization.load_pem_private_key(
-        f.read(),                               # read the file contents
-        password=None                           # no password on the key
-    )
+    # Prompt for missing info
+    if not server_ip:
+        server_ip = input("Enter validator server IP (e.g., 192.168.1.1): ").strip()
+        config["server_ip"] = server_ip
+    if not server_port:
+        server_port = input("Enter validator server port (e.g., 8000): ").strip()
+        config["server_port"] = server_port
+    if not wallet_name:
+        wallet_name = input("Enter the wallet name to use for mining: ").strip()
+        config["wallet_name"] = wallet_name
 
-# load public key
-with open("miner_wallet.pub", "rb") as f:          # open the public key file
-    public_key_pem = f.read().decode().strip() # store the text version for JSON output (turn into normat text bytes)
+    # Save/update the config file
+    with open(config_file, "w") as f:
+        json.dump(config, f)
+
+    server_url = f"http://{server_ip}:{server_port}/submit_tx"
+    print(f"Using validator server at: {server_url}")
+    return server_ip, server_port, server_url, wallet_name
+
+# --------------------
+# Main Menu
+# --------------------
+def main_menu():
+    """
+    Display a menu for the user before mining starts.
+    Options:
+        1. Update server URL
+        2. View wallet info
+        3. Start mining
+        4. Exit
+    """
+    global server_ip, server_port, server_url
+    global wallet_name, private_key_path, public_key_path
+    
+    while True:
+        print("="*50)
+        print(" " * 16 + "Miner Setup")
+        print("="*50)
+        print("1. Update server URL")
+        print("2. View wallet info")
+        print("3. Start mining")
+        print("4. Exit program")
+        choice = input("Select an option: ").strip()
+
+        if choice == "1":
+            # Update server IP/port using the config
+            server_ip, server_port, server_url, _ = load_or_init_config(CONFIG_FILE)
+            print(f"Server URL updated to: {server_url}")
+
+        elif choice == "2":
+            # Display wallet info
+            print("\nWallet Info:")
+            print(f"    Wallet name : {wallet_name}")
+            print(f"    Private key : {private_key_path}")
+            print(f"    Public key  : {public_key_path}")
+
+        elif choice == "3":
+            # Start mining (exit menu)
+            print("Starting mining...")
+            break
+
+        elif choice == "4":
+            # Exit program gracefully
+            print("Exiting program.")
+            exit(0)
+
+        else:
+            # Invalid choice handler
+            print("Invalid option, please try again.")
 
 
-# ----------------------------------------------------------
-# Validator server
-# ----------------------------------------------------------
-server_url = "http://192.168.1.1:8000/submit_tx"  # FastAPI endpoint (used to submit the transaction)
 
+# 1. Load or initialize config
+server_ip, server_port, server_url, wallet_name = load_or_init_config(CONFIG_FILE)
+
+# 2. Load wallet
+private_key, public_key_pem, private_key_path, public_key_path = load_wallet(wallet_name)
+
+# 3. Optional settings/info menu (QoL only)
+open_menu = input("Open settings menu? (y/N): ").strip().lower()
+if open_menu == "y":
+    main_menu()
 
 
 # Open the CSV file to log readings locally (not used in crypto project - just cool to look at)

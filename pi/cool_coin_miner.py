@@ -136,26 +136,25 @@ def load_or_init_config(config_file=CONFIG_FILE):
 # --------------------
 # Main Menu
 # --------------------
-def main_menu():
+def sub_menu():
     """
     Display a menu for the user before mining starts.
     Options:
-        1. Update server URL
-        2. View wallet info
-        3. Start mining
-        4. Exit
+        1. Update Config
+        2. View Config
+        3. Return Main Menu
     """
     global server_ip, server_port, server_url
     global wallet_name, private_key_path, public_key_path
     
     while True:
-        print("="*50)
-        print(" " * 16 + "Miner Setup")
-        print("="*50)
-        print("1. Update server URL")
-        print("2. View wallet info")
-        print("3. Start mining")
-        print("4. Exit program")
+        print("="*24)
+        print(" " * 8 + "Config")
+        print("="*24)
+        print("1. Update Config")
+        print("2. View Config")
+        print("3. Back")
+        print() #skip line
         choice = input("Select an option: ").strip()
 
         if choice == "1":
@@ -164,27 +163,62 @@ def main_menu():
             print(f"Server URL updated to: {server_url}")
 
         elif choice == "2":
-            # Display wallet info
-            print("\nWallet Info:")
-            print(f"    Wallet name : {wallet_name}")
-            print(f"    Private key : {private_key_path}")
-            print(f"    Public key  : {public_key_path}")
+            
+            # Display wallet info   
+            print() #skip line
+            print("-"*60)
+            print(f"Using validator server at: {server_url}")
+            print(f"Wallet name: {wallet_name}")
+            print("-"*60)
+            
+            print() #skip line
 
         elif choice == "3":
+            # Return to main menu
+            return
+        else:
+            # Invalid choice handler
+            print("\nInvalid option, please try again.")
+
+def main_menu():
+    """
+    Display a menu for the user before mining starts.
+    Options:
+        1. Start Mining
+        2. Edit/View Config
+        3. Exit
+    """
+    global server_ip, server_port, server_url
+    global wallet_name, private_key_path, public_key_path
+    
+    while True:
+        print("="*24)
+        print(" " * 8 + "Config")
+        print("="*24)
+        print("1. Start Mining")
+        print("2. Edit/View Config")
+        print("3. Exit program")
+        print() #skip line
+        choice = input("Select an option: ").strip()
+
+        if choice == "1":
             # Start mining (exit menu)
-            print("Starting mining...")
+            print("\nStarting mining...")
             break
 
-        elif choice == "4":
+        elif choice == "2":
+            # Optional Config Menu
+            print() #skip line
+            sub_menu() 
+
+        elif choice == "3":
             # Exit program gracefully
-            print("Exiting program.")
+            print("\nExiting program")
             exit(0)
 
         else:
             # Invalid choice handler
             print("Invalid option, please try again.")
-
-
 
 # 1. Load or initialize config
 server_ip, server_port, server_url, wallet_name = load_or_init_config(CONFIG_FILE)
@@ -192,11 +226,13 @@ server_ip, server_port, server_url, wallet_name = load_or_init_config(CONFIG_FIL
 # 2. Load wallet
 private_key, public_key_pem, private_key_path, public_key_path = load_wallet(wallet_name)
 
-# 3. Optional settings/info menu (QoL only)
-open_menu = input("Open settings menu? (y/N): ").strip().lower()
+main_menu()
+"""
+# 3. Optional Config Menu
+open_menu = input("Edit/View Config? (y/N): ").strip().lower()
 if open_menu == "y":
     main_menu()
-
+ """
 
 # Open the CSV file to log readings locally (not used in crypto project - just cool to look at)
 with open("bme280_log.csv", "a", newline="") as csvfile:  # appemd to the CSV file

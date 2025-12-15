@@ -62,8 +62,8 @@ def load_wallet(wallet_name):
 
     # Make sure the wallet name is not empty
     if not wallet_name:
-        print("Wallet name cannot be empty. Exiting...") 
-        exit(1)
+        print("Wallet name cannot be empty.") 
+        return None, None, None, None
 
     # construct full paths to private/public keys
     private_key_path = os.path.join(WALLET_DIR, f"{wallet_name}.pem")
@@ -72,28 +72,31 @@ def load_wallet(wallet_name):
     # Wallet Existence Check 
     if not os.path.exists(private_key_path) or not os.path.exists(public_key_path):
         print(f"Wallet '{wallet_name}' does not exist!")
-        print(f"Make sure {private_key_path} and {public_key_path} exist.")
-        exit(1)
+        print(f"Make sure {private_key_path} and {public_key_path} exist.\n")
+        return None, None, None, None
 
-    # load private key
-    with open(private_key_path, "rb") as f:              # open the private key file
-        private_key = serialization.load_pem_private_key(
-            f.read(),                               # read the file contents
-            password=None                           # no password on the key
-        )
-
-    # load public key
-    with open(public_key_path, "rb") as f:         # open the public key file
-        public_key_pem = f.read().decode().strip() # store the text version for JSON output (turn into normat text bytes)
-
-    print(f"Loaded wallet '{wallet_name}' successfully!")
-
+    try: 
+        # load private key
+        with open(private_key_path, "rb") as f:              # open the private key file
+         private_key = serialization.load_pem_private_key(
+               f.read(),                               # read the file contents
+               password=None                           # no password on the key
+          )
+         # load public key
+        with open(public_key_path, "rb") as f:         # open the public key file
+            public_key_pem = f.read().decode().strip() # store the text version for JSON output (turn into normat text bytes)
+    except Exception as e:
+        print("Failed to load wallet:", e)
+        return None, None, None, None
+    
+    print(f"Loaded wallet '{wallet_name}' successfully!\n")
     return private_key, public_key_pem, private_key_path, public_key_path
 
-def load_or_init_config(config_file=CONFIG_FILE):
+def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     """
     Load server config and wallet name from JSON.
-    If the file doesn't exist or entries are missing, prompt the user and save.
+    If first run → mandatory setup.
+    If force_edit=True → re-prompt user and overwrite values.
     Returns: server_ip, server_port, server_url, wallet_name
     """
     first_run = not os.path.exists(config_file)
@@ -108,29 +111,33 @@ def load_or_init_config(config_file=CONFIG_FILE):
     server_port = config.get("server_port")
     wallet_name = config.get("wallet_name")
 
+    # First run banner
     if first_run:
-        print("="*50)
+        print("=" * 50)
         print(" " * 16 + "Miner Setup")
-        print("="*50)
+        print("=" * 50)
 
-
-    # Prompt for missing info
-    if not server_ip:
-        server_ip = input("Enter validator server IP (e.g., 192.168.1.1): ").strip()
+    # ---------- PROMPT LOGIC ----------
+    # Prompt if missing OR if user explicitly wants to edit
+    if first_run or force_edit or not server_ip:
+        server_ip = input("\nEnter validator server IP (e.g., 192.168.1.1): ").strip()
         config["server_ip"] = server_ip
-    if not server_port:
+
+    if first_run or force_edit or not server_port:
         server_port = input("Enter validator server port (e.g., 8000): ").strip()
         config["server_port"] = server_port
-    if not wallet_name:
+
+    if first_run or force_edit or not wallet_name:
         wallet_name = input("Enter the wallet name to use for mining: ").strip()
         config["wallet_name"] = wallet_name
 
-    # Save/update the config file
+    # Save updated config
     with open(config_file, "w") as f:
-        json.dump(config, f)
+        json.dump(config, f, indent=4)
 
     server_url = f"http://{server_ip}:{server_port}/submit_tx"
-    print(f"Using validator server at: {server_url}")
+    print(f"\nUsing validator server at: {server_url}")
+
     return server_ip, server_port, server_url, wallet_name
 
 # --------------------
@@ -159,8 +166,13 @@ def sub_menu():
 
         if choice == "1":
             # Update server IP/port using the config
-            server_ip, server_port, server_url, _ = load_or_init_config(CONFIG_FILE)
-            print(f"Server URL updated to: {server_url}")
+            server_ip, server_port, server_url, wallet_name = load_or_init_config(
+            CONFIG_FILE,
+            force_edit=True
+            )
+            # Try to reload wallet immediately after config change
+            global private_key, public_key_pem, private_key_path, public_key_path
+            private_key, public_key_pem, private_key_path, public_key_path = load_wallet(wallet_name)
 
         elif choice == "2":
             
@@ -175,6 +187,7 @@ def sub_menu():
 
         elif choice == "3":
             # Return to main menu
+            print() #skip line
             return
         else:
             # Invalid choice handler
@@ -193,7 +206,7 @@ def main_menu():
     
     while True:
         print("="*24)
-        print(" " * 8 + "Config")
+        print(" " * 8 + "Menu")
         print("="*24)
         print("1. Start Mining")
         print("2. Edit/View Config")
@@ -203,6 +216,10 @@ def main_menu():
 
         if choice == "1":
             # Start mining (exit menu)
+            if private_key is None:           
+                    print("\nCannot start mining: wallet not loaded. Please update your wallet in the config menu first.\n")
+                    continue  # force them to stay in main menu
+            
             print("\nStarting mining...")
             break
 
@@ -225,6 +242,7 @@ server_ip, server_port, server_url, wallet_name = load_or_init_config(CONFIG_FIL
 
 # 2. Load wallet
 private_key, public_key_pem, private_key_path, public_key_path = load_wallet(wallet_name)
+
 
 main_menu()
 """

@@ -47,11 +47,115 @@ bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c)  # initialize the sensor with 
 bme280.sea_level_pressure = 1013.25            # optional calibration for altitude calculations (unused)
 
 
-WALLET_DIR = os.path.join("..", "shared", "wallets")  # points to ../shared/wallets               # all wallets stored here
+WALLET_DIR = os.path.join("..", "shared", "wallets")  # path that points to ../shared/wallets               # all wallets stored here
 CONFIG_FILE = "miner_config.json"
+
+
+# Miner/Node identity (NOT a wallet)
+
+# Build the path to the directory that stores this node's identity keys
+NODE_ID_DIR = os.path.join("..", "pi", "identity")
+
+# Full path to the node's private key file
+NODE_PRIV_KEY_PATH = os.path.join(NODE_ID_DIR, "node_ed25519.pem")
+
+# Full path to the node's public key file
+NODE_PUB_KEY_PATH  = os.path.join(NODE_ID_DIR, "node_ed25519.pub")
+
+
 # --------------------
 # Function definitions
 # --------------------
+
+def load_or_init_node_identity():
+    """
+    Load or initialize the node's identity.
+
+    - This identity uniquely represents the physical device (Pi).
+    - It is generated once on first run and reused forever.
+    - It is NOT a wallet and never receives funds directly.
+    
+    """
+
+    # Ensure the identity directory exists (safe to call even if it already exists)
+    os.makedirs(NODE_ID_DIR, exist_ok=True)
+
+    # --------------------
+    # First-run check
+    # --------------------
+
+    # If the private key does not exist, this is the first time this node is running
+    if not os.path.exists(NODE_PRIV_KEY_PATH):
+
+        # Inform the user that a new node identity is being created
+        print("Generating new node identity...\n")
+
+        # Generate a brand-new Ed25519 private key for this node
+        node_private_key = Ed25519PrivateKey.generate()
+
+        # Derive the corresponding public key from the private key
+        node_public_key = node_private_key.public_key()
+
+        # --------------------
+        # Save private key
+        # --------------------
+
+        # Open the private key file in binary write mode
+        with open(NODE_PRIV_KEY_PATH, "wb") as f:
+
+            # Serialize and write the private key in PEM format
+            f.write(
+                node_private_key.private_bytes(
+                    encoding=serialization.Encoding.PEM,            # PEM text encoding
+                    format=serialization.PrivateFormat.PKCS8,        # Standard private key format
+                    encryption_algorithm=serialization.NoEncryption() # No password (device-bound key)
+                )
+            )
+
+        # --------------------
+        # Save public key
+        # --------------------
+
+        # Open the public key file in binary write mode
+        with open(NODE_PUB_KEY_PATH, "wb") as f:
+
+            # Serialize and write the public key in PEM format
+            f.write(
+                node_public_key.public_bytes(
+                    encoding=serialization.Encoding.PEM,             # PEM text encoding
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo  # Standard public key format
+                )
+            )
+
+        # Confirm successful creation
+        print("Node identity created successfully.\n")
+
+    # --------------------
+    # Load existing identity
+    # --------------------
+
+    # Open the node's private key file in binary read mode
+    with open(NODE_PRIV_KEY_PATH, "rb") as f:
+
+        # Deserialize the private key from PEM format
+        node_private_key = serialization.load_pem_private_key(
+            f.read(),        # Read the entire file
+            password=None    # No password was used when saving
+        )
+
+    # Open the node's public key file in binary read mode
+    with open(NODE_PUB_KEY_PATH, "rb") as f:
+
+        # Read, decode, and strip the public key so it can be sent in JSON
+        node_public_key_pem = f.read().decode().strip()
+
+    # Confirm that the node identity was loaded successfully
+    print("Loaded node identity.\n")
+
+    # Return both keys for use by the miner
+    return node_private_key, node_public_key_pem
+
+
 
 def load_wallet(wallet_name):
     """
@@ -327,8 +431,6 @@ with open("bme280_log.csv", "a", newline="") as csvfile:  # appemd to the CSV fi
                 resp = r.json()  # Convert the JSON response from the validator to a Python dictionary
 
             except Exception as e:    
-                print("Error sending to validator:", e)
-                print("Details:", e)
                 # Use a fallback response so the rest of the code doesn't crash
                 resp = {
                 'status': 'Server Down',

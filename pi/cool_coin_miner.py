@@ -52,22 +52,14 @@ CONFIG_FILE = "miner_config.json"
 
 
 # Miner/Node identity (NOT a wallet)
-
-# Build the path to the directory that stores this node's identity keys
-NODE_ID_DIR = os.path.join("..", "pi", "identity")
-
-# Full path to the node's private key file
-NODE_PRIV_KEY_PATH = os.path.join(NODE_ID_DIR, "node_ed25519.pem")
-
-# Full path to the node's public key file
-NODE_PUB_KEY_PATH  = os.path.join(NODE_ID_DIR, "node_ed25519.pub")
+NODE_ID_DIR = os.path.join("..", "pi", "ID") # Build the path to the directory that stores this node's identity keys
+NODE_PRIV_KEY_PATH = os.path.join(NODE_ID_DIR, "node_ed25519.pem") # Full path to the node's private key file
+NODE_PUB_KEY_PATH  = os.path.join(NODE_ID_DIR, "node_ed25519.pub") # Full path to the node's public key file
 
 
-# --------------------
-# Function definitions
-# --------------------
 
-def load_or_init_node_identity():
+# -----Function definitions -------------------------------------------
+def load_or_init_node_ID():
     """
     Load or initialize the node's identity.
 
@@ -77,18 +69,18 @@ def load_or_init_node_identity():
     
     """
 
-    # Ensure the identity directory exists (safe to call even if it already exists)
+    # Ensure the identity directory exists 
     os.makedirs(NODE_ID_DIR, exist_ok=True)
 
     # --------------------
     # First-run check
     # --------------------
 
-    # If the private key does not exist, this is the first time this node is running
+    # If the private key does not exist - this is the first time this node is running
     if not os.path.exists(NODE_PRIV_KEY_PATH):
 
         # Inform the user that a new node identity is being created
-        print("Generating new node identity...\n")
+        print("Generating node ID...\n")
 
         # Generate a brand-new Ed25519 private key for this node
         node_private_key = Ed25519PrivateKey.generate()
@@ -128,7 +120,7 @@ def load_or_init_node_identity():
             )
 
         # Confirm successful creation
-        print("Node identity created successfully.\n")
+        print("Node ID established.\n")
 
     # --------------------
     # Load existing identity
@@ -150,7 +142,7 @@ def load_or_init_node_identity():
         node_public_key_pem = f.read().decode().strip()
 
     # Confirm that the node identity was loaded successfully
-    print("Loaded node identity.\n")
+    print("Loaded node ID.\n")
 
     # Return both keys for use by the miner
     return node_private_key, node_public_key_pem
@@ -341,20 +333,19 @@ def main_menu():
             # Invalid choice handler
             print("Invalid option, please try again.")
 
-# 1. Load or initialize config
+
+# 1. Load or intitiaizle node ID
+node_private_key, node_public_key_pem = load_or_init_node_ID()
+
+# 2. Load or initialize config
 server_ip, server_port, server_url, wallet_name = load_or_init_config(CONFIG_FILE)
 
-# 2. Load wallet
+# 3. Load wallet
 private_key, public_key_pem, private_key_path, public_key_path = load_wallet(wallet_name)
 
-
+# 4. Open main menu
 main_menu()
-"""
-# 3. Optional Config Menu
-open_menu = input("Edit/View Config? (y/N): ").strip().lower()
-if open_menu == "y":
-    main_menu()
- """
+
 
 # Open the CSV file to log readings locally (not used in crypto project - just cool to look at)
 with open("bme280_log.csv", "a", newline="") as csvfile:  # appemd to the CSV file
@@ -398,11 +389,11 @@ with open("bme280_log.csv", "a", newline="") as csvfile:  # appemd to the CSV fi
             # prepare signature for payload
             
             #convert readings into JSON string and turns it into bytes.
-            message = json.dumps(sensor_readings, sort_keys=True).encode() 
+            message = json.dumps(sensor_readings, sort_keys=True).encode()
             
-             # sign bytes from above using Pi's private key
+             # sign bytes from above using node's private key
              # resulting in a long sequence of pytes that proves the message came from this device (Pi)
-            signature_bytes = private_key.sign(message) 
+            signature_bytes = node_private_key.sign(message)
            
            # convert bytes into base64 so they can be placed in the JSON payload safely
            # This is not encryption, it is just making it so that it can be printable in the end
@@ -413,7 +404,7 @@ with open("bme280_log.csv", "a", newline="") as csvfile:  # appemd to the CSV fi
             # -----------------------------------------------------------------
             tx_payload = {
                 "type": "MINT", #transaction type is always MINT (creating coins)
-                "from_addr": public_key_pem,  # public key of the device (signer)
+                "from_addr": node_public_key_pem,  # node ID
                 "to_addr": public_key_pem, # wallet receiving coins
                 "amount": 1, # coins to reward
                 "reading": sensor_readings, # sensor data
@@ -474,6 +465,10 @@ with open("bme280_log.csv", "a", newline="") as csvfile:  # appemd to the CSV fi
      
 
             print("="*50 + "\n")
+            
+            print(f"Node ID: {node_public_key_pem[:16]}...")  # truncate for readability
+            print(f"Wallet: {wallet_name}")
+            
 
             # wait 1 second before next reading (mines every second)
             time.sleep(1)

@@ -1,15 +1,18 @@
-# ---- Sensitive keys ----
+# Sensitive keys 
 *.pem
 *.pub
 
-# ---- Runtime / generated data ----
+# Runtime / generated data 
 *.json
 *.csv
 
-# ---- Python cache ----
+# Python cache
 __pycache__/
 *.pyc
 
-# ---- OS junk ----
+# OS junk
 .DS_Store
 Thumbs.db
+
+# Ignore node identity (device-bound, not a wallet)
+pi/identity/

@@ -37,8 +37,10 @@ from adafruit_bme280 import basic as adafruit_bme280  # sensor driver (handles l
 from cryptography.hazmat.primitives import serialization  # lets us load/store keys
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey # uses Ed25519's signing ability, allowing us to sign json payload with private key
 
-
 import os # for clearing the terminal
+
+
+# -----Initializations -------------------------------------------
 
 # Initialize the BME280 sensor over I2C
 i2c = busio.I2C(board.SCL, board.SDA)          # create an I2C connection on SCL/SDA pins
@@ -69,7 +71,7 @@ def load_or_init_node_ID():
     
     """
 
-    # Ensure the identity directory exists 
+    # Make sure the identity directory exists 
     os.makedirs(NODE_ID_DIR, exist_ok=True)
 
     # --------------------

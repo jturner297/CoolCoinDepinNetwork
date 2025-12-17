@@ -80,7 +80,7 @@ def load_or_init_node_ID():
     if not os.path.exists(NODE_PRIV_KEY_PATH):
 
         # Inform the user that a new node identity is being created
-        print("Generating node ID...\n")
+        print("\nGenerating node ID...")
 
         # Generate a brand-new Ed25519 private key for this node
         node_private_key = Ed25519PrivateKey.generate()

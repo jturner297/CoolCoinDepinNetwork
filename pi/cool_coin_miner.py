@@ -154,43 +154,35 @@ def load_or_init_node_ID():
 
 def load_wallet(wallet_name):
     """
-    Load the private and public keys for a given wallet name.
-    Exits the program if the wallet does not exist or the name is empty.
-    Returns: private_key, public_key_pem, private_key_path, public_key_path
+    Load the public key for a given wallet name.
+    Exits the program if the key does not exist or the name is empty.
+    Returns: public_key_pem (address to send reward to)
     """
 
     # Make sure the wallet name is not empty
     if not wallet_name:
         print("Wallet name cannot be empty.") 
-        return None, None, None, None
+        return None 
 
-    # construct full paths to private/public keys
-    private_key_path = os.path.join(WALLET_DIR, f"{wallet_name}.pem")
+    # construct full paths to public key
     public_key_path  = os.path.join(WALLET_DIR, f"{wallet_name}.pub")
 
     # Wallet Existence Check 
-    if not os.path.exists(private_key_path) or not os.path.exists(public_key_path):
-        print(f"Wallet '{wallet_name}' does not exist!")
-        print(f"Make sure {private_key_path} and {public_key_path} exist.\n")
-        return None, None, None, None # back out and return nothing
+    if not os.path.exists(public_key_path): # public key is not present
+        print(f"Wallet '{wallet_name}' public key does not exist!")
+        return None # back out and return nothing
 
-    try: #try to load wallet
-        # load private key
-        with open(private_key_path, "rb") as f:              # open the private key file
-         private_key = serialization.load_pem_private_key(
-               f.read(),                               # read the file contents
-               password=None                           # no password on the key
-          )
+    try: #try to load wallet address
          # load public key
         with open(public_key_path, "rb") as f:         # open the public key file
             public_key_pem = f.read().decode().strip() # store the text version for JSON output (turn into normat text bytes)
    
     except Exception as e: # failed to load wallet
-        print("Failed to load wallet:", e) #inform user
-        return None, None, None, None # back out and return nothing
+        print("Failed to load wallet public key:", e) #inform user
+        return None  # back out and return nothing
     
-    print(f"Loaded wallet '{wallet_name}' successfully!\n")
-    return private_key, public_key_pem, private_key_path, public_key_path # return the wallet data
+    print(f"Loaded wallet '{wallet_name}' public key successfully!\n")
+    return public_key_pem # return the wallet address data
 
 def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     """
@@ -252,7 +244,7 @@ def sub_menu():
         3. Return Main Menu
     """
     global server_ip, server_port, server_url
-    global wallet_name, private_key_path, public_key_path
+    global wallet_name, public_key_path
     
     while True:
         print("="*24)
@@ -271,8 +263,8 @@ def sub_menu():
             force_edit=True
             )
             # Try to reload wallet immediately after config change
-            global private_key, public_key_pem, private_key_path, public_key_path
-            private_key, public_key_pem, private_key_path, public_key_path = load_wallet(wallet_name)
+            global public_key_pem
+            public_key_pem = load_wallet(wallet_name)
 
         elif choice == "2":
             
@@ -302,7 +294,7 @@ def main_menu():
         3. Exit
     """
     global server_ip, server_port, server_url
-    global wallet_name, private_key_path, public_key_path
+    global wallet_name, public_key_path
     
     while True:
         print("="*24)
@@ -316,8 +308,8 @@ def main_menu():
 
         if choice == "1":
             # Start mining (exit menu)
-            if private_key is None:           
-                    print("\nCannot start mining: wallet not loaded. Please update your wallet in the config menu first.\n")
+            if public_key_pem  is None:           
+                    print("\nCannot start mining: wallet public key not loaded. Please update your wallet in the config menu first.\n")
                     continue  # force them to stay in main menu
             
             print("\nStarting mining...")
@@ -345,7 +337,7 @@ node_private_key, node_public_key_pem = load_or_init_node_ID()
 server_ip, server_port, server_url, wallet_name = load_or_init_config(CONFIG_FILE)
 
 # 3. Load wallet
-private_key, public_key_pem, private_key_path, public_key_path = load_wallet(wallet_name)
+public_key_pem = load_wallet(wallet_name)
 
 # 4. Open main menu
 main_menu()

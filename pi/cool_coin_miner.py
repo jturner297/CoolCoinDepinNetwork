@@ -123,6 +123,7 @@ def load_or_init_node_ID():
 
         # Confirm successful creation
         print("Node ID established.\n")
+        
 
     # --------------------
     # Load existing identity
@@ -171,9 +172,9 @@ def load_wallet(wallet_name):
     if not os.path.exists(private_key_path) or not os.path.exists(public_key_path):
         print(f"Wallet '{wallet_name}' does not exist!")
         print(f"Make sure {private_key_path} and {public_key_path} exist.\n")
-        return None, None, None, None
+        return None, None, None, None # back out and return nothing
 
-    try: 
+    try: #try to load wallet
         # load private key
         with open(private_key_path, "rb") as f:              # open the private key file
          private_key = serialization.load_pem_private_key(
@@ -183,12 +184,13 @@ def load_wallet(wallet_name):
          # load public key
         with open(public_key_path, "rb") as f:         # open the public key file
             public_key_pem = f.read().decode().strip() # store the text version for JSON output (turn into normat text bytes)
-    except Exception as e:
-        print("Failed to load wallet:", e)
-        return None, None, None, None
+   
+    except Exception as e: # failed to load wallet
+        print("Failed to load wallet:", e) #inform user
+        return None, None, None, None # back out and return nothing
     
     print(f"Loaded wallet '{wallet_name}' successfully!\n")
-    return private_key, public_key_pem, private_key_path, public_key_path
+    return private_key, public_key_pem, private_key_path, public_key_path # return the wallet data
 
 def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     """
@@ -212,7 +214,7 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     # First run banner
     if first_run:
         print("=" * 50)
-        print(" " * 16 + "Miner Setup")
+        print(" " * 16 + "Configuration")
         print("=" * 50)
 
     # ---------- PROMPT LOGIC ----------
@@ -254,7 +256,7 @@ def sub_menu():
     
     while True:
         print("="*24)
-        print(" " * 8 + "Config")
+        print(" " * 8 + "Node Config")
         print("="*24)
         print("1. Update Config")
         print("2. View Config")

@@ -58,7 +58,7 @@ BLOCK_TIME = 10  # every 10 seconds we make a block (how often coins get confirm
 # -----------------------------
 class Transaction(BaseModel):
     type: str  # transaction type: "MINT" or "TRANSFER"
-    from_addr: str  # PEM public key string (belongs to sender)
+    from_addr: str  # PEM public key string (node ID)
     to_addr: str  # wallet recieving coins
     amount: float  # coins to transfer or mint
     reading: dict | None = None  # optional sensor reading (only used for MINT transactions)

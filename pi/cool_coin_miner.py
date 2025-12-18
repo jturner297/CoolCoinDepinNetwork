@@ -224,6 +224,12 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     if first_run or force_edit or not wallet_name:
         wallet_name = input("Enter the wallet name to recieve rewards: ").strip()
         config["wallet_name"] = wallet_name
+        
+    if first_run or force_edit or not node_nickname:
+        node_nickname = input(
+            "Enter a nickname for this node: "
+        ).strip()
+        config["node_nickname"] = node_nickname  # Save nickname to config
 
     # Save updated config
     with open(config_file, "w") as f:
@@ -232,7 +238,7 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     server_url = f"http://{server_ip}:{server_port}/submit_tx" #build full validator url
     print(f"\nUsing validator server at: {server_url}") # print server url being used
 
-    return server_ip, server_port, server_url, wallet_name # return relevant config values
+    return server_ip, server_port, server_url, wallet_name, node_nickname # return relevant config values
 
 # --------------------
 # Main Menu
@@ -331,12 +337,52 @@ def main_menu():
             # Invalid choice handler
             print("Invalid option, please try again.")
 
-
+# ---------------------------------------------------
+#  Send nickname to validator (optional, for dashboard)
+# ---------------------------------------------------
+def register_node_nickname(server_ip, server_port, node_pubkey_pem, node_nickname):
+    """
+    Send this node's nickname to the validator for dashboard resolution.
+    
+    - node_pub_key_pem: Node's Ed25519 public key (unique identifier)
+    - node_nickname: The nickname string
+    - server_ip: Validator IP
+    - server_port: Validator port
+    
+    This does NOT sign the nickname. The validator only stores it
+    and resolves duplicates.
+    """
+    
+    # Build URL for nickname endpoint
+    url = f"http://{server_ip}:{server_port}/node_nickname"
+    
+    # Build the JSON payload
+    payload = {
+        "node_pubkey": node_pubkey_pem, # node ID (pi public key)
+        "nickname": node_nickname  # human-readable nickname
+    }
+    
+    try:
+         # Make a POST request to the validator
+        r = requests.post(url, json=payload, timeout=2)
+        resp = r.json()
+        if resp.get("status") == "ok":
+            print(f"Nickname '{node_nickname}' registered with validator successfully.\n")
+        else:
+            print(f"Validator rejected nickname '{node_nickname}': {resp.get('reason', 'Unknown')}\n")
+    except Exception as e:
+        print(f"Failed to register nickname with validator: {e}\n")
+        
+        
 # 1. Load or intitiaizle node ID
 node_private_key, node_public_key_pem = load_or_init_node_ID()
 
 # 2. Load or initialize config
-server_ip, server_port, server_url, wallet_name = load_or_init_config(CONFIG_FILE)
+server_ip, server_port, server_url, wallet_name, node_nickname = load_or_init_config(CONFIG_FILE)
+
+# 3. Register and Push node nickname to validator
+register_node_nickname(node_public_key_pem, node_nickname, server_ip, server_port)
+display_node_name = node_nickname  # local display variable for terminal dashboard
 
 # 3. Load wallet
 public_key_pem = load_wallet(wallet_name)
@@ -464,7 +510,6 @@ with open("bme280_log.csv", "a", newline="") as csvfile:  # appemd to the CSV fi
 
             print("="*50 + "\n")
             
-            print(f"Node ID: {node_public_key_pem[:16]}...")  # truncate for readability
             print(f"Wallet: {wallet_name}")
             
 

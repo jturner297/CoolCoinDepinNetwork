@@ -45,10 +45,6 @@ import os # for clearing the terminal
 # Initialize the BME280 sensor over I2C
 i2c = busio.I2C(board.SCL, board.SDA)          # create an I2C connection on SCL/SDA pins
 bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c)  # initialize the sensor with that I2C bus
-
-bme280.sea_level_pressure = 1013.25            # optional calibration for altitude calculations (unused)
-
-
 WALLET_DIR = os.path.join("..", "shared", "wallets")  # path that points to ../shared/wallets               # all wallets stored here
 CONFIG_FILE = "miner_config.json"
 
@@ -168,7 +164,7 @@ def load_wallet(wallet_name):
 
     # Wallet Existence Check 
     if not os.path.exists(public_key_path): # public key is not present
-        print(f"'{wallet_name}' wallet public key does not exist!")
+        print(f"ERROR: '{wallet_name}' wallet public key can't be load: does not exist in directory!\n")
         return None # back out and return nothing
 
     try: #try to load wallet address
@@ -180,7 +176,6 @@ def load_wallet(wallet_name):
         print("Failed to load wallet public key:", e) #inform user
         return None  # back out and return nothing
     
-    print(f"Loaded '{wallet_name}' wallet public key successfully!")
     return public_key_pem # return the wallet address data
 
 def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
@@ -193,6 +188,7 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     """
     first_run = not os.path.exists(config_file) # check if the config file doesn't exist (True means first run)
 
+# 3. Register and Push node nickname to validator
     if not first_run: # if not the first run, 
         with open(config_file, "r") as f: # open the existing config up
             config = json.load(f) #load JSON data from file
@@ -219,24 +215,28 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     if first_run or force_edit or not wallet_name:
         wallet_name = input("Enter the wallet name to recieve rewards: ").strip()
         config["wallet_name"] = wallet_name
-        
+        global public_key_pem
+        public_key_pem = load_wallet(wallet_name)
+
     if first_run or force_edit or not node_nickname:
         node_nickname = input(
-            "Enter an alias for this node: "
+            "Enter a nickname for this node: "
         ).strip()
         config["node_nickname"] = node_nickname  # Save nickname to config
+        node_pubkey_flat = node_public_key_pem.replace("\n", "")
+        register_node_nickname(server_ip, server_port, node_pubkey_flat, node_nickname)
+    
 
     # Save updated config
     with open(config_file, "w") as f:
         json.dump(config, f, indent=4)
 
     server_url = f"http://{server_ip}:{server_port}/submit_tx" #build full validator url
-    print(f"\nUsing validator server at: {server_url}") # print server url being used
 
     return server_ip, server_port, server_url, wallet_name, node_nickname # return relevant config values
 
 # --------------------
-# Main Menu
+# Menus
 # --------------------
 def sub_menu():
     """
@@ -263,13 +263,8 @@ def sub_menu():
             CONFIG_FILE,
             force_edit=True
             )
-            # Try to reload wallet immediately after config change
-            global public_key_pem
-            public_key_pem = load_wallet(wallet_name)
-            
-            # Submit changed nickname to validator
-            node_pubkey_flat = node_public_key_pem.replace("\n", "")
-            register_node_nickname(server_ip, server_port, node_pubkey_flat, node_nickname)
+
+      
 
         elif choice == "2":
             
@@ -300,7 +295,7 @@ def main_menu():
         3. Exit
     """
     global server_ip, server_port, server_url
-    global wallet_name, public_key_path
+    global wallet_name
     
     while True:
         print("-------Main Menu-------")
@@ -372,21 +367,19 @@ def register_node_nickname(server_ip, server_port, node_pubkey_pem, node_nicknam
 
 
        
-# 1. Load or intitiaizle node ID
+# 1. Load or intitiaizle node ID (Critical Step)
 node_private_key, node_public_key_pem = load_or_init_node_ID()
 
 # 2. Load or initialize config
 server_ip, server_port, server_url, wallet_name, node_nickname = load_or_init_config(CONFIG_FILE)
 
-# 3. Register and Push node nickname to validator
-node_pubkey_flat = node_public_key_pem.replace("\n", "")
-register_node_nickname(server_ip, server_port, node_pubkey_flat, node_nickname)
-#display_node_name = node_nickname  # local display variable for terminal dashboard
+# 3. Load wallet
+if wallet_name:
+    public_key_pem = load_wallet(wallet_name)
+else:
+    public_key_pem = None
 
-# 4. Load wallet
-public_key_pem = load_wallet(wallet_name)
-
-# 5. Open main menu
+# 4. Open main menu
 main_menu()
 
 
@@ -508,8 +501,6 @@ with open("bme280_log.csv", "a", newline="") as csvfile:  # appemd to the CSV fi
             else:
              print(f"    {'Reward':<12}: 0")
             
-
-     
 
             print("="*50 + "\n")
             

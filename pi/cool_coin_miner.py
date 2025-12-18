@@ -169,7 +169,7 @@ def load_wallet(wallet_name):
 
     # Wallet Existence Check 
     if not os.path.exists(public_key_path): # public key is not present
-        print(f"Wallet '{wallet_name}' public key does not exist!")
+        print(f"'{wallet_name}' wallet public key does not exist!")
         return None # back out and return nothing
 
     try: #try to load wallet address
@@ -181,25 +181,27 @@ def load_wallet(wallet_name):
         print("Failed to load wallet public key:", e) #inform user
         return None  # back out and return nothing
     
-    print(f"Loaded wallet '{wallet_name}' public key successfully!\n")
+    print(f"Loaded '{wallet_name}' wallet public key successfully!\n")
     return public_key_pem # return the wallet address data
 
 def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     """
-    Load server config and wallet name from JSON.
-    If first run → mandatory setup.
-    If force_edit=True → re-prompt user and overwrite values.
+    Load node config from JSON.
+    If first run, do mandatory setup.
+    If force_edit=True, re-prompt user and overwrite config values.
+   
     Returns: server_ip, server_port, server_url, wallet_name
     """
-    first_run = not os.path.exists(config_file)
+    first_run = not os.path.exists(config_file) # check if the config file doesn't exist (True means first run)
 
-    if not first_run:
-        with open(config_file, "r") as f:
-            config = json.load(f)
-    else:
+    if not first_run: # if not the first run, 
+        with open(config_file, "r") as f: # open the existing config up
+            config = json.load(f) #load JSON data from file
+    else: # first run, create empty config
         config = {}
 
-    server_ip = config.get("server_ip")
+    # fetch config data
+    server_ip = config.get("server_ip") 
     server_port = config.get("server_port")
     wallet_name = config.get("wallet_name")
 
@@ -210,7 +212,7 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
         print("=" * 50)
 
     # ---------- PROMPT LOGIC ----------
-    # Prompt if missing OR if user explicitly wants to edit
+    # Prompt if missing (first run) OR if user explicitly wants to edit (picked sub_menu option)
     if first_run or force_edit or not server_ip:
         server_ip = input("\nEnter validator server IP (e.g., 192.168.1.1): ").strip()
         config["server_ip"] = server_ip
@@ -220,17 +222,17 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
         config["server_port"] = server_port
 
     if first_run or force_edit or not wallet_name:
-        wallet_name = input("Enter the wallet name to use for mining: ").strip()
+        wallet_name = input("Enter the wallet name to recieve rewards: ").strip()
         config["wallet_name"] = wallet_name
 
     # Save updated config
     with open(config_file, "w") as f:
         json.dump(config, f, indent=4)
 
-    server_url = f"http://{server_ip}:{server_port}/submit_tx"
-    print(f"\nUsing validator server at: {server_url}")
+    server_url = f"http://{server_ip}:{server_port}/submit_tx" #build full validator url
+    print(f"\nUsing validator server at: {server_url}") # print server url being used
 
-    return server_ip, server_port, server_url, wallet_name
+    return server_ip, server_port, server_url, wallet_name # return relevant config values
 
 # --------------------
 # Main Menu
@@ -298,7 +300,7 @@ def main_menu():
     
     while True:
         print("="*24)
-        print(" " * 8 + "Menu")
+        print(" " * 8 + "Main Menu")
         print("="*24)
         print("1. Start Mining")
         print("2. Edit/View Config")

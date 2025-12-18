@@ -15,4 +15,4 @@ __pycache__/
 Thumbs.db
 
 # Ignore node identity (device-bound, not a wallet)
-pi/identity/
+pi/ID/

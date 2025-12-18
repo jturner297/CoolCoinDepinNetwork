@@ -204,7 +204,8 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     server_ip = config.get("server_ip") 
     server_port = config.get("server_port")
     wallet_name = config.get("wallet_name")
-
+    node_nickname = config.get("node_nickname") 
+    
     # First run banner
     if first_run:
         print("=" * 50)
@@ -354,11 +355,11 @@ def register_node_nickname(server_ip, server_port, node_pubkey_pem, node_nicknam
     """
     
     # Build URL for nickname endpoint
-    url = f"http://{server_ip}:{server_port}/node_nickname"
+    url = f"http://{server_ip}:{server_port}/submit_nickname"
     
     # Build the JSON payload
     payload = {
-        "node_pubkey": node_pubkey_pem, # node ID (pi public key)
+        "pubkey": node_pubkey_pem, # node ID (pi public key)
         "nickname": node_nickname  # human-readable nickname
     }
     
@@ -384,10 +385,10 @@ server_ip, server_port, server_url, wallet_name, node_nickname = load_or_init_co
 register_node_nickname(node_public_key_pem, node_nickname, server_ip, server_port)
 display_node_name = node_nickname  # local display variable for terminal dashboard
 
-# 3. Load wallet
+# 4. Load wallet
 public_key_pem = load_wallet(wallet_name)
 
-# 4. Open main menu
+# 5. Open main menu
 main_menu()
 
 

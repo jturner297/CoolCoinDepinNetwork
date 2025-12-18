@@ -144,8 +144,7 @@ def load_or_init_node_ID():
         # Read, decode, and strip the public key so it can be sent in JSON
         node_public_key_pem = f.read().decode().strip()
 
-    # Confirm that the node identity was loaded successfully
-    print("Loaded node ID.\n")
+
 
     # Return both keys for use by the miner
     return node_private_key, node_public_key_pem
@@ -181,7 +180,7 @@ def load_wallet(wallet_name):
         print("Failed to load wallet public key:", e) #inform user
         return None  # back out and return nothing
     
-    print(f"Loaded '{wallet_name}' wallet public key successfully!\n")
+    print(f"Loaded '{wallet_name}' wallet public key successfully!")
     return public_key_pem # return the wallet address data
 
 def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
@@ -223,7 +222,7 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
         
     if first_run or force_edit or not node_nickname:
         node_nickname = input(
-            "Enter a nickname for this node: "
+            "Enter an alias for this node: "
         ).strip()
         config["node_nickname"] = node_nickname  # Save nickname to config
 
@@ -248,13 +247,11 @@ def sub_menu():
         3. Return Main Menu
     """
     global server_ip, server_port, server_url
-    global wallet_name, public_key_path, node_nickname
+    global wallet_name, node_nickname
     
     while True:
-        print("="*24)
-        print(" " * 8 + "Node Config")
-        print("="*24)
-        print("1. Update Config")
+        print("-------Node Config-------")
+        print("1. Reset Config")
         print("2. View Config")
         print("3. Back")
         print() #skip line
@@ -280,6 +277,7 @@ def sub_menu():
             print() #skip line
             print("-"*60)
             print(f"Using validator server at: {server_url}")
+            print(f"Node name: {node_nickname}")
             print(f"Wallet name: {wallet_name}")
             print("-"*60)
             
@@ -298,18 +296,16 @@ def main_menu():
     Display a menu for the user before mining starts.
     Options:
         1. Start Mining
-        2. Edit/View Config
+        2. Reset/View Config
         3. Exit
     """
     global server_ip, server_port, server_url
     global wallet_name, public_key_path
     
     while True:
-        print("="*24)
-        print(" " * 8 + "Main Menu")
-        print("="*24)
+        print("-------Main Menu-------")
         print("1. Start Mining")
-        print("2. Edit/View Config")
+        print("2. Reset/View Config")
         print("3. Exit program")
         print() #skip line
         choice = input("Select an option: ").strip()
@@ -366,7 +362,7 @@ def register_node_nickname(server_ip, server_port, node_pubkey_pem, node_nicknam
          # Make a POST request to the validator
         r = requests.post(url, json=payload, timeout=2)
         resp = r.json()
-        if resp.get("status") == "ok":
+        if resp.get("status") == "success":
             print(f"Nickname '{node_nickname}' registered with validator successfully.\n")
         else:
             print(f"Validator rejected nickname '{node_nickname}': {resp.get('reason', 'Unknown')}\n")
@@ -385,7 +381,7 @@ server_ip, server_port, server_url, wallet_name, node_nickname = load_or_init_co
 # 3. Register and Push node nickname to validator
 node_pubkey_flat = node_public_key_pem.replace("\n", "")
 register_node_nickname(server_ip, server_port, node_pubkey_flat, node_nickname)
-display_node_name = node_nickname  # local display variable for terminal dashboard
+#display_node_name = node_nickname  # local display variable for terminal dashboard
 
 # 4. Load wallet
 public_key_pem = load_wallet(wallet_name)
@@ -491,6 +487,10 @@ with open("bme280_log.csv", "a", newline="") as csvfile:  # appemd to the CSV fi
 
 
             # Sensor readings
+            
+            
+            print(f"Node: {node_nickname }")
+            print(f"Wallet: {wallet_name}" , "\n")
             print("Readings:")
             print(f"    {'Temperature':<12}: {temp:6.2f} °C")
             print(f"    {'Pressure':<12}:  {pres:6.2f} hPa")
@@ -513,7 +513,7 @@ with open("bme280_log.csv", "a", newline="") as csvfile:  # appemd to the CSV fi
 
             print("="*50 + "\n")
             
-            print(f"Wallet: {wallet_name}")
+   
             
 
             # wait 1 second before next reading (mines every second)

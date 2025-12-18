@@ -206,11 +206,6 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     wallet_name = config.get("wallet_name")
     node_nickname = config.get("node_nickname") 
     
-    # First run banner
-    if first_run:
-        print("=" * 50)
-        print(" " * 16 + "Configuration")
-        print("=" * 50)
 
     # ---------- PROMPT LOGIC ----------
     # Prompt if missing (first run) OR if user explicitly wants to edit (picked sub_menu option)
@@ -253,7 +248,7 @@ def sub_menu():
         3. Return Main Menu
     """
     global server_ip, server_port, server_url
-    global wallet_name, public_key_path
+    global wallet_name, public_key_path, node_nickname
     
     while True:
         print("="*24)
@@ -267,13 +262,17 @@ def sub_menu():
 
         if choice == "1":
             # Update server IP/port using the config
-            server_ip, server_port, server_url, wallet_name = load_or_init_config(
+            server_ip, server_port, server_url, wallet_name, node_nickname = load_or_init_config(
             CONFIG_FILE,
             force_edit=True
             )
             # Try to reload wallet immediately after config change
             global public_key_pem
             public_key_pem = load_wallet(wallet_name)
+            
+            # Submit changed nickname to validator
+            node_pubkey_flat = node_public_key_pem.replace("\n", "")
+            register_node_nickname(server_ip, server_port, node_pubkey_flat, node_nickname)
 
         elif choice == "2":
             
@@ -374,7 +373,9 @@ def register_node_nickname(server_ip, server_port, node_pubkey_pem, node_nicknam
     except Exception as e:
         print(f"Failed to register nickname with validator: {e}\n")
         
-        
+
+
+       
 # 1. Load or intitiaizle node ID
 node_private_key, node_public_key_pem = load_or_init_node_ID()
 
@@ -382,7 +383,8 @@ node_private_key, node_public_key_pem = load_or_init_node_ID()
 server_ip, server_port, server_url, wallet_name, node_nickname = load_or_init_config(CONFIG_FILE)
 
 # 3. Register and Push node nickname to validator
-register_node_nickname(node_public_key_pem, node_nickname, server_ip, server_port)
+node_pubkey_flat = node_public_key_pem.replace("\n", "")
+register_node_nickname(server_ip, server_port, node_pubkey_flat, node_nickname)
 display_node_name = node_nickname  # local display variable for terminal dashboard
 
 # 4. Load wallet

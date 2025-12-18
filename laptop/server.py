@@ -87,6 +87,22 @@ def load_state():
         with open(MEMPOOL_FILE, "r") as f:  # open it in read mode
             mempool = json.load(f) # load
 
+NICKNAME_FILE = "node_nicknames.json"  # File where node nicknames are stored persistently
+node_nicknames = {}  # In-memory dictionary mapping node public keys (PEM) to nicknames
+
+# Save nicknames to file
+def save_nicknames():
+    with open(NICKNAME_FILE, "w") as f:  # open in write mode
+        json.dump(node_nicknames, f, indent=4)  # write dictionary as JSON
+
+# Load existing nicknames from file
+def load_nicknames():
+    global node_nicknames  # we want to update the global variable
+    if os.path.exists(NICKNAME_FILE):  # check if nickname file exists
+        with open(NICKNAME_FILE, "r") as f:  # open in read mode
+            node_nicknames = json.load(f)  # load JSON data into dictionary
+    else:
+        node_nicknames = {}  # if file does not exist, start with empty dictionary
 
 # -----------------------------
 # Blockchain Utilities
@@ -158,6 +174,7 @@ def verify_signature(tx):
 @app.on_event("startup")
 def start():
     # load_state() # load previous block chain states on startup (for persistent wallets) Experimental feature, turned off 
+    # load_nicknames()  # populate the dictionary when server starts
     if len(blockchain) == 0: #if the block chain hasn't been created yet
         create_genesis() # initate the chain with the genesis block
     threading.Thread(target=produce_blocks, daemon=True).start() # start a background thread that runs produce_blocks() infintely
@@ -239,3 +256,33 @@ def get_chain():
 def get_mempool():
     # Just return the current mempool, dashboard uses it to compute pending coins
     return mempool
+
+
+# Endpoint to register or update a node nickname
+@app.post("/submit_nickname")  # create POST endpoint at /node_nickname
+def submit_nickname(payload: dict):  # expects JSON payload with pubkey + nickname
+    """
+    Accepts a node's public key and a nickname.
+    Stores mapping in memory + saves to file
+    """
+    pubkey = payload.get("pubkey")  # extract public key from incoming JSON
+    nickname = payload.get("nickname")  # extract nickname from incoming JSON
+
+    # validate input
+    if not pubkey or not nickname:  # both must exist
+        raise HTTPException(400, "Missing pubkey or nickname")  # bad request
+
+    node_nicknames[pubkey] = nickname  # store in dictionary
+    save_nicknames()  # persist to file
+
+    return {"status": "success", "pubkey": pubkey, "nickname": nickname}  # confirm success
+
+@app.get("/node_nickname/{pubkey}")  # retrieves the node nickname
+def get_node_nickname(pubkey: str):  
+    """
+    Returns the nickname for a given node public key.
+    """
+    nickname = node_nicknames.get(pubkey)  # look up nickname in dictionary
+    if not nickname:  # if not found
+        return {"status": "not_found", "pubkey": pubkey}  # return placeholder
+    return {"status": "found", "pubkey": pubkey, "nickname": nickname}  # return nickname

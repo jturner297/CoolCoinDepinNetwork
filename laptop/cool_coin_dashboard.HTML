@@ -176,7 +176,7 @@ useful for debugging, visualization, and demo purposes.
 // Public Keys Array
 const WALLETS = [
     { addr: `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAbY6KkLUBTO8c5MEH8F88Re1p1LEPeYu47LKIG2DVP8o= 
+MCowBQYDK2VwAyEAYAg3HLWQ/H7bhRl7pL/YIhdClzpxiMaGG/A0qMUeg50=
 -----END PUBLIC KEY-----`, suffix: "1" },
     { addr: `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEACc9KcsPrVITBEgZMSX1rgF+MI56fKH+Jd/MjGVplGA0=
@@ -184,8 +184,8 @@ MCowBQYDK2VwAyEACc9KcsPrVITBEgZMSX1rgF+MI56fKH+Jd/MjGVplGA0=
 ]; 
 
 function normalizeAddr(addr) { return addr.replace(/\s+/g,''); } //Helper function that normalizes wallet (remove all whitespace)
-async function fetchBlockchain() { try { return await (await fetch('http://192.168.137.2:8000/chain')).json(); } catch { return []; } } //fetch blockchain for pending transactions, return empty on error
-async function fetchMempool() { try { return await (await fetch('http://192.168.137.2:8000/mempool')).json(); } catch { return []; } }//fetch mempool for pending transactions, return empty on error
+async function fetchBlockchain() { try { return await (await fetch('http://192.168.1.1:8000/chain')).json(); } catch { return []; } } //fetch blockchain for pending transactions, return empty on error
+async function fetchMempool() { try { return await (await fetch('http://192.168.1.1:8000/mempool')).json(); } catch { return []; } }//fetch mempool for pending transactions, return empty on error
 
 const lastTxs = [null, null];// Array track latest transaction per wallet
 

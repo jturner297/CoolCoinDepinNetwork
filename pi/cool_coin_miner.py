@@ -144,188 +144,6 @@ def load_or_init_node_ID():
 
     # Return both keys for use by the miner
     return node_private_key, node_public_key_pem
-
-def load_config(config_file=CONFIG_FILE):
-    """
-    Read config from disk.
-    """
-    
-   
-
-     # Check whether this is the first time the program is running (config exists)
-    if os.path.exists(config_file):
-        with open(config_file, "r") as f: # open the existing config up
-            config = json.load(f) #load JSON data from file
-            
-    else: # first run, create empty config
-        config = {}
-        
-    # Current values
-    return  config
-
-def load_wallet(wallet_name):
-    """
-    Load the public key for a given wallet name.
-    Exits the program if the key does not exist or the name is empty.
-    Returns: public_key_pem (address to send reward to)
-    """
-
-    # Make sure the wallet name is not empty
-    if not wallet_name:
-        print("Wallet name cannot be empty.") 
-        return None 
-
-    # construct full paths to public key
-    public_key_path  = os.path.join(WALLET_DIR, f"{wallet_name}.pub")
-
-    # Wallet Existence Check 
-    if not os.path.exists(public_key_path): # public key is not present
-        print(f"ERROR: '{wallet_name}' wallet public key can't be load: does not exist in directory!\n")
-        return None # back out and return nothing
-
-    try: #try to load wallet address
-         # load public key
-        with open(public_key_path, "rb") as f:         # open the public key file
-            public_key_pem = f.read().decode().strip() # store the text version for JSON output (turn into normat text bytes)
-   
-    except Exception as e: # failed to load wallet
-        print("Failed to load wallet public key:", e) #inform user
-        return None  # back out and return nothing
-    
-    return public_key_pem # return the wallet address data
-
-
-def init_config(node_public_key_pem, config_file=CONFIG_FILE):
-    
-    print("\n--- Initial Node Setup ---") #banner
-
-    # prompt user
-    server_ip = input("Enter validator server IP (e.g., 192.168.1.1): ").strip() 
-    server_port = input("Enter validator server port (e.g., 8000): ").strip()
-    
-    wallet_name = input("Enter the wallet name to recieve rewards: ").strip()
-    public_key_pem = load_wallet(wallet_name)
-
-    node_nickname = input("Enter a nickname for this node: ").strip()
-       
-       
-    # build config with user input
-    config = {
-        "server_ip": server_ip,
-        "server_port": server_port,
-        "wallet_name": wallet_name,
-        "node_nickname": node_nickname,
-    }
-
-    # Save new config
-    with open(config_file, "w") as f:
-        json.dump(config, f, indent=4)
-    
-    register_node_nickname(server_ip, server_port, node_public_key_pem, node_nickname) # try to register nickname with server
-    
-    server_url = f"http://{server_ip}:{server_port}/submit_tx" #build full validator url
-
-    return server_ip, server_port, server_url, wallet_name, node_nickname, public_key_pem
-# --------------------
-# Menus
-# --------------------
-def sub_menu():
-    """
-    Display a menu for the user before mining starts.
-    Options:
-        1. Update Config
-        2. View Config
-        3. Return Main Menu
-    """
-    global server_ip, server_port, server_url
-    global wallet_name, node_nickname
-    
-    while True:
-        print("\n-------Node Config-------")
-        print("1. Reset Config")
-        print("2. View Config")
-        print("3. Back")
-        print() #skip line
-        choice = input("Select an option: ").strip()
-
-        if choice == "1":
-            # Update server IP/port using the config
-            (
-            server_ip,
-            server_port,
-            server_url,
-            wallet_name,
-            node_nickname,
-            new_public_key_pem
-            ) = update_config(CONFIG_FILE)
-
-            if new_public_key_pem is not None:
-                public_key_pem = new_public_key_pem
-  
-
-        elif choice == "2":
-            
-            # Display wallet info   
-            print() #skip line
-            print("-"*60)
-            print(f"Using validator server at: {server_url}")
-            print(f"Node name: {node_nickname}")
-            print(f"Wallet name: {wallet_name}")
-            print("-"*60)
-            
-            print() #skip line
-
-        elif choice == "3":
-            # Return to main menu
-            return
-        else:
-            # Invalid choice handler
-            print("\nInvalid option, please try again.")
-
-def main_menu():
-    """
-    Display a menu for the user before mining starts.
-    Options:
-        1. Start Mining
-        2. Reset/View Config
-        3. Exit
-    """
-    global server_ip, server_port, server_url
-    global wallet_name
-    
-    while True:
-        print("\n-------Main Menu-------")
-        print("1. Start Mining")
-        print("2. Reset/View Config")
-        print("3. Exit program")
-        print() #skip line
-        choice = input("Select an option: ").strip()
-
-        if choice == "1":
-            # Start mining (exit menu)
-            if public_key_pem  is None:           
-                    print("\nCannot start mining: wallet public key not loaded. Please update your wallet in the config menu first.\n")
-                    continue  # force them to stay in main menu
-            
-            print("\nStarting mining...")
-            break
-
-        elif choice == "2":
-            # Optional Config Menu
-            sub_menu() 
-
-        elif choice == "3":
-            # Exit program gracefully
-            print("\nExiting program")
-            exit(0)
-
-        else:
-            # Invalid choice handler
-            print("Invalid option, please try again.")
-
-# ---------------------------------------------------
-#  Send nickname to validator (optional, for dashboard)
-# ---------------------------------------------------
 def register_node_nickname(server_ip, server_port, node_pubkey_pem, node_nickname):
     """
     Send this node's nickname to the validator for dashboard resolution.
@@ -359,6 +177,68 @@ def register_node_nickname(server_ip, server_port, node_pubkey_pem, node_nicknam
     except Exception as e:
         print(f"Failed to register nickname with validator: {e}\n")
         
+
+def init_config(node_public_key_pem, config_file=CONFIG_FILE):
+    
+    print("\n--- Initial Node Setup ---") #banner
+
+    # prompt user
+    server_ip = input("Enter validator server IP (e.g., 192.168.1.1): ").strip() 
+    server_port = input("Enter validator server port (e.g., 8000): ").strip()
+    
+    wallet_name = input("Enter the wallet name to recieve rewards: ").strip()
+    public_key_pem = load_wallet(wallet_name)
+
+    node_nickname = input("Enter a nickname for this node: ").strip()
+       
+       
+    # build config with user input
+    config = {
+        "server_ip": server_ip,
+        "server_port": server_port,
+        "wallet_name": wallet_name,
+        "node_nickname": node_nickname,
+    }
+
+    # Save new config
+    with open(config_file, "w") as f:
+        json.dump(config, f, indent=4)
+    
+    register_node_nickname(server_ip, server_port, node_public_key_pem, node_nickname) # try to register nickname with server
+    
+    server_url = f"http://{server_ip}:{server_port}/submit_tx" #build full validator url
+
+    return server_ip, server_port, server_url, wallet_name, node_nickname, public_key_pem
+
+def load_config(config_file=CONFIG_FILE):
+    """
+    Read config from disk.
+    """
+    
+   
+
+     # Check whether this is the first time the program is running (config exists)
+    if os.path.exists(config_file):
+        with open(config_file, "r") as f: # open the existing config up
+            config = json.load(f) #load JSON data from file
+            
+    else: # first run, create empty config
+        config = {}
+        
+    # Current values
+    return  config
+
+def get_config_values(config):
+    server_ip     = config.get("server_ip")
+    server_port   = config.get("server_port")
+    wallet_name   = config.get("wallet_name")
+    node_nickname = config.get("node_nickname")
+
+    server_url = None
+    if server_ip and server_port:
+        server_url = f"http://{server_ip}:{server_port}/submit_tx"
+
+    return server_ip, server_port, server_url, wallet_name, node_nickname     
 
 def update_config(config_file=CONFIG_FILE):
     """
@@ -414,18 +294,145 @@ def update_config(config_file=CONFIG_FILE):
     server_url = f"http://{server_ip}:{server_port}/submit_tx"
 
     return server_ip, server_port, server_url, wallet_name, node_nickname, public_key_pem
+
+def load_wallet(wallet_name):
+    """
+    Load the public key for a given wallet name.
+    Exits the program if the key does not exist or the name is empty.
+    Returns: public_key_pem (address to send reward to)
+    """
+
+    # Make sure the wallet name is not empty
+    if not wallet_name:
+        print("Wallet name cannot be empty.") 
+        return None 
+
+    # construct full paths to public key
+    public_key_path  = os.path.join(WALLET_DIR, f"{wallet_name}.pub")
+
+    # Wallet Existence Check 
+    if not os.path.exists(public_key_path): # public key is not present
+        print(f"ERROR: '{wallet_name}' wallet public key can't be load: does not exist in directory!\n")
+        return None # back out and return nothing
+
+    try: #try to load wallet address
+         # load public key
+        with open(public_key_path, "rb") as f:         # open the public key file
+            public_key_pem = f.read().decode().strip() # store the text version for JSON output (turn into normat text bytes)
+   
+    except Exception as e: # failed to load wallet
+        print("Failed to load wallet public key:", e) #inform user
+        return None  # back out and return nothing
     
-def get_config_values(config):
-    server_ip     = config.get("server_ip")
-    server_port   = config.get("server_port")
-    wallet_name   = config.get("wallet_name")
-    node_nickname = config.get("node_nickname")
+    return public_key_pem # return the wallet address data
 
-    server_url = None
-    if server_ip and server_port:
-        server_url = f"http://{server_ip}:{server_port}/submit_tx"
 
-    return server_ip, server_port, server_url, wallet_name, node_nickname     
+
+# --------------------
+# Menus
+# --------------------
+def main_menu():
+    """
+    Display a menu for the user before mining starts.
+    Options:
+        1. Start Mining
+        2. Reset/View Config
+        3. Exit
+    """
+    global server_ip, server_port, server_url
+    global wallet_name
+    
+    while True:
+        print("\n-------Main Menu-------")
+        print("1. Start Mining")
+        print("2. Reset/View Config")
+        print("3. Exit program")
+        print() #skip line
+        choice = input("Select an option: ").strip()
+
+        if choice == "1":
+            # Start mining (exit menu)
+            if public_key_pem  is None:           
+                    print("\nCannot start mining: wallet public key not loaded. Please update your wallet in the config menu first.\n")
+                    continue  # force them to stay in main menu
+            
+            print("\nStarting mining...")
+            break
+
+        elif choice == "2":
+            # Optional Config Menu
+            sub_menu() 
+
+        elif choice == "3":
+            # Exit program gracefully
+            print("\nExiting program")
+            exit(0)
+
+        else:
+            # Invalid choice handler
+            print("Invalid option, please try again.")
+
+
+
+def sub_menu():
+    """
+    Display a menu for the user before mining starts.
+    Options:
+        1. Update Config
+        2. View Config
+        3. Return Main Menu
+    """
+    global server_ip, server_port, server_url
+    global wallet_name, node_nickname
+    
+    while True:
+        print("\n-------Node Config-------")
+        print("1. Reset Config")
+        print("2. View Config")
+        print("3. Back")
+        print() #skip line
+        choice = input("Select an option: ").strip()
+
+        if choice == "1":
+            # Update server IP/port using the config
+            (
+            server_ip,
+            server_port,
+            server_url,
+            wallet_name,
+            node_nickname,
+            new_public_key_pem
+            ) = update_config(CONFIG_FILE)
+
+            if new_public_key_pem is not None:
+                public_key_pem = new_public_key_pem
+  
+
+        elif choice == "2":
+            
+            # Display wallet info   
+            print() #skip line
+            print("-"*60)
+            print(f"Using validator server at: {server_url}")
+            print(f"Node name: {node_nickname}")
+            print(f"Wallet name: {wallet_name}")
+            print("-"*60)
+            
+            print() #skip line
+
+        elif choice == "3":
+            # Return to main menu
+            return
+        else:
+            # Invalid choice handler
+            print("\nInvalid option, please try again.")
+
+
+
+
+
+    
+
 # 1. Load or intitiaizle node ID (Critical Step)
 node_private_key, node_public_key_pem = load_or_init_node_ID()
 

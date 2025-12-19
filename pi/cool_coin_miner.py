@@ -188,7 +188,7 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
     """
     first_run = not os.path.exists(config_file) # check if the config file doesn't exist (True means first run)
 
-# 3. Register and Push node nickname to validator
+    # Register and Push node nickname to validator
     if not first_run: # if not the first run, 
         with open(config_file, "r") as f: # open the existing config up
             config = json.load(f) #load JSON data from file
@@ -219,12 +219,16 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
         public_key_pem = load_wallet(wallet_name)
 
     if first_run or force_edit or not node_nickname:
+        previous_nickname = config.get("node_nickname", "").strip()
         node_nickname = input(
             "Enter a nickname for this node: "
         ).strip()
         config["node_nickname"] = node_nickname  # Save nickname to config
-        node_pubkey_flat = node_public_key_pem.replace("\n", "")
-        register_node_nickname(server_ip, server_port, node_pubkey_flat, node_nickname)
+       
+        # Only register new nickname if it is not the same as the previous one
+        if node_nickname != previous_nickname: 
+            node_pubkey_flat = node_public_key_pem.replace("\n", "")
+            register_node_nickname(server_ip, server_port, node_pubkey_flat, node_nickname)
     
 
     # Save updated config
@@ -250,7 +254,7 @@ def sub_menu():
     global wallet_name, node_nickname
     
     while True:
-        print("-------Node Config-------")
+        print("\n-------Node Config-------")
         print("1. Reset Config")
         print("2. View Config")
         print("3. Back")
@@ -280,7 +284,6 @@ def sub_menu():
 
         elif choice == "3":
             # Return to main menu
-            print() #skip line
             return
         else:
             # Invalid choice handler
@@ -298,7 +301,7 @@ def main_menu():
     global wallet_name
     
     while True:
-        print("-------Main Menu-------")
+        print("\n-------Main Menu-------")
         print("1. Start Mining")
         print("2. Reset/View Config")
         print("3. Exit program")
@@ -316,7 +319,6 @@ def main_menu():
 
         elif choice == "2":
             # Optional Config Menu
-            print() #skip line
             sub_menu() 
 
         elif choice == "3":

@@ -145,7 +145,30 @@ def load_or_init_node_ID():
     # Return both keys for use by the miner
     return node_private_key, node_public_key_pem
 
+def get_config_values(config_file=CONFIG_FILE):
+    """
+    Read config values from disk.
+    Returns None for missing values.
+    """
+    first_run = not os.path.exists(config_file)
 
+    # Register and Push node nickname to validator
+    if not first_run:
+        with open(config_file, "r") as f: # open the existing config up
+            config = json.load(f) #load JSON data from file
+            
+    else: # first run, create empty config
+        config = {}
+        
+    # Current values
+    return (
+        first_run,
+        config,
+        config.get("server_ip"),
+        config.get("server_port"),
+        config.get("wallet_name"),
+        config.get("node_nickname"),
+    )
 
 def load_wallet(wallet_name):
     """
@@ -186,20 +209,14 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
    
     Returns: server_ip, server_port, server_url, wallet_name
     """
-    first_run = not os.path.exists(config_file) # check if the config file doesn't exist (True means first run)
-
-    # Register and Push node nickname to validator
-    if not first_run: # if not the first run, 
-        with open(config_file, "r") as f: # open the existing config up
-            config = json.load(f) #load JSON data from file
-    else: # first run, create empty config
-        config = {}
-
-    # fetch config data
-    server_ip = config.get("server_ip") 
-    server_port = config.get("server_port")
-    wallet_name = config.get("wallet_name")
-    node_nickname = config.get("node_nickname") 
+    (
+        first_run,
+        config,
+        server_ip,
+        server_port,
+        wallet_name,
+        node_nickname,
+    ) = get_config_values(config_file)
     
 
     # ---------- PROMPT LOGIC ----------
@@ -239,6 +256,8 @@ def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
 
     return server_ip, server_port, server_url, wallet_name, node_nickname # return relevant config values
 
+
+    
 # --------------------
 # Menus
 # --------------------

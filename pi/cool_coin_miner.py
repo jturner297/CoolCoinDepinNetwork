@@ -336,16 +336,16 @@ def main_menu():
     Display a menu for the user before mining starts.
     Options:
         1. Start Mining
-        2. Reset/View Config
+        2. Edit/View Config
         3. Exit
     """
     global server_ip, server_port, server_url
-    global wallet_name
+    global wallet_name, public_key_pem
     
     while True:
         print("\n-------Main Menu-------")
         print("1. Start Mining")
-        print("2. Reset/View Config")
+        print("2. Edit/View Config")
         print("3. Exit program")
         print() #skip line
         choice = input("Select an option: ").strip()
@@ -353,7 +353,7 @@ def main_menu():
         if choice == "1":
             # Start mining (exit menu)
             if public_key_pem  is None:           
-                    print("\nCannot start mining: wallet public key not loaded. Please update your wallet in the config menu first.\n")
+                    print("\nCannot start mining: wallet public key not loaded. \nPlease update your wallet in the config menu first.")
                     continue  # force them to stay in main menu
             
             print("\nStarting mining...")
@@ -383,7 +383,7 @@ def sub_menu():
         3. Return Main Menu
     """
     global server_ip, server_port, server_url
-    global wallet_name, node_nickname
+    global wallet_name, node_nickname, public_key_pem
     
     while True:
         print("\n-------Node Config-------")

@@ -289,7 +289,7 @@ def sub_menu():
             wallet_name,
             node_nickname,
             new_public_key_pem
-            ) = update_config_interactive(CONFIG_FILE)
+            ) = update_config(CONFIG_FILE)
 
             if new_public_key_pem is not None:
                 public_key_pem = new_public_key_pem

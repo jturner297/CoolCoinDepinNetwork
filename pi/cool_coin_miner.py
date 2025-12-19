@@ -145,7 +145,7 @@ def load_or_init_node_ID():
     # Return both keys for use by the miner
     return node_private_key, node_public_key_pem
 
-def get_config_values(config_file=CONFIG_FILE):
+def load_config(config_file=CONFIG_FILE):
     """
     Read config values from disk.
     Returns None for missing values.
@@ -201,63 +201,38 @@ def load_wallet(wallet_name):
     
     return public_key_pem # return the wallet address data
 
-def load_or_init_config(config_file=CONFIG_FILE, force_edit=False):
-    """
-    Load node config from JSON.
-    If first run, do mandatory setup.
-    If force_edit=True, re-prompt user and overwrite config values.
-   
-    Returns: server_ip, server_port, server_url, wallet_name
-    """
-    (
-        first_run,
-        config,
-        server_ip,
-        server_port,
-        wallet_name,
-        node_nickname,
-    ) = get_config_values(config_file)
+
+def init_config(config_file=CONFIG_FILE):
     
+    print("\n--- Initial Node Setup ---\n") #banner
 
-    # ---------- PROMPT LOGIC ----------
-    # Prompt if missing (first run) OR if user explicitly wants to edit (picked sub_menu option)
-    if first_run or force_edit or not server_ip:
-        server_ip = input("\nEnter validator server IP (e.g., 192.168.1.1): ").strip()
-        config["server_ip"] = server_ip
+    # prompt user
+    server_ip = input("\nEnter validator server IP (e.g., 192.168.1.1): ").strip() 
+    server_port = input("Enter validator server port (e.g., 8000): ").strip()
+    
+    wallet_name = input("Enter the wallet name to recieve rewards: ").strip()
+    public_key_pem = load_wallet(wallet_name)
 
-    if first_run or force_edit or not server_port:
-        server_port = input("Enter validator server port (e.g., 8000): ").strip()
-        config["server_port"] = server_port
-
-    if first_run or force_edit or not wallet_name:
-        wallet_name = input("Enter the wallet name to recieve rewards: ").strip()
-        config["wallet_name"] = wallet_name
-        global public_key_pem
-        public_key_pem = load_wallet(wallet_name)
-
-    if first_run or force_edit or not node_nickname:
-        previous_nickname = config.get("node_nickname", "").strip()
-        node_nickname = input(
-            "Enter a nickname for this node: "
-        ).strip()
-        config["node_nickname"] = node_nickname  # Save nickname to config
+    node_nickname = input("Enter a nickname for this node: ").strip()
        
-        # Only register new nickname if it is not the same as the previous one
-        if node_nickname != previous_nickname: 
-            node_pubkey_flat = node_public_key_pem.replace("\n", "")
-            register_node_nickname(server_ip, server_port, node_pubkey_flat, node_nickname)
-    
+       
+    # build config with user input
+    config = {
+        "server_ip": server_ip,
+        "server_port": server_port,
+        "wallet_name": wallet_name,
+        "node_nickname": node_nickname,
+    }
 
-    # Save updated config
+    # Save new config
     with open(config_file, "w") as f:
         json.dump(config, f, indent=4)
-
+    
+    register_node_nickname(server_ip, server_port, node_public_key_pem, node_nickname) # try to register nickname with server
+    
     server_url = f"http://{server_ip}:{server_port}/submit_tx" #build full validator url
 
-    return server_ip, server_port, server_url, wallet_name, node_nickname # return relevant config values
-
-
-    
+    return server_ip, server_port, server_url, wallet_name, node_nickname, public_key_pem
 # --------------------
 # Menus
 # --------------------
@@ -404,7 +379,7 @@ def update_config(config_file=CONFIG_FILE):
         server_port,
         wallet_name,
         node_nickname,
-    ) = get_config_values(config_file)
+    ) = load_config(config_file)
     
     nickname_changed = False
     wallet_changed   = False
@@ -458,13 +433,28 @@ def update_config(config_file=CONFIG_FILE):
 node_private_key, node_public_key_pem = load_or_init_node_ID()
 
 # 2. Load or initialize config
-server_ip, server_port, server_url, wallet_name, node_nickname = load_or_init_config(CONFIG_FILE)
+config = load_config()
 
 # 3. Load wallet
-if wallet_name:
-    public_key_pem = load_wallet(wallet_name)
+if config is None:
+    (
+        server_ip,
+        server_port,
+        server_url,
+        wallet_name,
+        node_nickname,
+        public_key_pem
+    ) = init_config()
 else:
-    public_key_pem = None
+    (
+        server_ip,
+        server_port,
+        server_url,
+        wallet_name,
+        node_nickname
+    ) = config
+
+    public_key_pem = load_wallet(wallet_name)
 
 # 4. Open main menu
 main_menu()

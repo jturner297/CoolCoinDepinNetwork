@@ -366,7 +366,7 @@ def update_config(config_file=CONFIG_FILE):
     Interactively update config fields one-by-one.
     Only modifies fields the user explicitly chooses.
     """
-    first_run, config = load_config(config_file)
+    config = load_config(config_file)
     
     server_ip, server_port, server_url, wallet_name, node_nickname = get_config_values(config)
     
@@ -410,8 +410,7 @@ def update_config(config_file=CONFIG_FILE):
         public_key_pem = load_wallet(wallet_name)
 
     if nickname_changed:
-        node_pubkey_flat = node_public_key_pem.replace("\n", "")
-        register_node_nickname(server_ip, server_port, node_pubkey_flat, node_nickname)
+        register_node_nickname(server_ip, server_port, node_public_key_pem, node_nickname)
 
     server_url = f"http://{server_ip}:{server_port}/submit_tx"
 
@@ -432,23 +431,14 @@ def get_config_values(config):
 node_private_key, node_public_key_pem = load_or_init_node_ID()
 
 # 2. Load config metadata
-first_run, config = load_config()
+config = load_config()
 
 # if config does not exist yet
 
-if first_run:  # Run first-time initialization
-    (
-        server_ip,
-        server_port,
-        server_url,
-        wallet_name,
-        node_nickname,
-        public_key_pem
-    ) = init_config(node_public_key_pem)
+if not config :  # Run first-time initialization
+    server_ip, server_port, server_url, wallet_name, node_nickname, public_key_pem = init_config(node_public_key_pem)
 else:
     server_ip, server_port, server_url, wallet_name, node_nickname = get_config_values(config)
-    server_url    = f"http://{server_ip}:{server_port}/submit_tx"
-
     public_key_pem = load_wallet(wallet_name)
 
 # 4. Open main menu

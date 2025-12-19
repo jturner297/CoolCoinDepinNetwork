@@ -483,8 +483,8 @@ with open("bme280_log.csv", "a", newline="") as csvfile:  # appemd to the CSV fi
             # Sensor readings
             
             
-            print(f"Node: {node_nickname }")
-            print(f"Wallet: {wallet_name}" , "\n")
+            print(f"\nSensing Node: {node_nickname }")
+            print(f"Payout Wallet: {wallet_name}" , "\n")
             print("Readings:")
             print(f"    {'Temperature':<12}: {temp:6.2f} °C")
             print(f"    {'Pressure':<12}:  {pres:6.2f} hPa")

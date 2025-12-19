@@ -150,11 +150,10 @@ def load_config(config_file=CONFIG_FILE):
     Read config from disk.
     """
     
-    # Check whether this is the first time the program is running
-    first_run = not os.path.exists(config_file)
+   
 
-    # If this is NOT the first run
-    if not first_run:
+     # Check whether this is the first time the program is running (config exists)
+    if os.path.exists(config_file):
         with open(config_file, "r") as f: # open the existing config up
             config = json.load(f) #load JSON data from file
             
@@ -162,7 +161,7 @@ def load_config(config_file=CONFIG_FILE):
         config = {}
         
     # Current values
-    return first_run, config
+    return  config
 
 def load_wallet(wallet_name):
     """
@@ -201,7 +200,7 @@ def init_config(node_public_key_pem, config_file=CONFIG_FILE):
     print("\n--- Initial Node Setup ---") #banner
 
     # prompt user
-    server_ip = input("\nEnter validator server IP (e.g., 192.168.1.1): ").strip() 
+    server_ip = input("Enter validator server IP (e.g., 192.168.1.1): ").strip() 
     server_port = input("Enter validator server port (e.g., 8000): ").strip()
     
     wallet_name = input("Enter the wallet name to recieve rewards: ").strip()

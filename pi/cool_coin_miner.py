@@ -282,10 +282,17 @@ def sub_menu():
 
         if choice == "1":
             # Update server IP/port using the config
-            server_ip, server_port, server_url, wallet_name, node_nickname = load_or_init_config(
-            CONFIG_FILE,
-            force_edit=True
-            )
+            (
+            server_ip,
+            server_port,
+            server_url,
+            wallet_name,
+            node_nickname,
+            new_public_key_pem
+            ) = update_config_interactive(CONFIG_FILE)
+
+            if new_public_key_pem is not None:
+                public_key_pem = new_public_key_pem
   
 
         elif choice == "2":
@@ -385,7 +392,67 @@ def register_node_nickname(server_ip, server_port, node_pubkey_pem, node_nicknam
         print(f"Failed to register nickname with validator: {e}\n")
         
 
+def update_config(config_file=CONFIG_FILE):
+    """
+    Interactively update config fields one-by-one.
+    Only modifies fields the user explicitly chooses.
+    """
+    (
+        first_run,
+        config,
+        server_ip,
+        server_port,
+        wallet_name,
+        node_nickname,
+    ) = get_config_values(config_file)
+    
+    nickname_changed = False
+    wallet_changed   = False
+    
+    print("\n--- Update Node Configuration ---\n")
+    
+    print(f"Validator IP: {server_ip}")
+    if input("Update validator IP? (y/N): ").strip().lower() == "y":
+        server_ip = input("Enter new validator IP: ").strip()
+        config["server_ip"] = server_ip
 
+    print(f"\nValidator Port: {server_port}")
+    if input("Update validator port? (y/N): ").strip().lower() == "y":
+        server_port = input("Enter new validator port: ").strip()
+        config["server_port"] = server_port
+
+    print(f"\nWallet name: {wallet_name}")
+    if input("Update wallet? (y/N): ").strip().lower() == "y":
+        wallet_name = input("Enter new wallet name: ").strip()
+        config["wallet_name"] = wallet_name
+        wallet_changed = True
+
+    print(f"\nNode nickname: {node_nickname}")
+    if input("Update node nickname? (y/N): ").strip().lower() == "y":
+        new_nickname = input("Enter new node nickname: ").strip()
+        if new_nickname != node_nickname:
+            node_nickname = new_nickname
+            config["node_nickname"] = node_nickname
+            nickname_changed = True
+    
+    # Save config
+    with open(config_file, "w") as f:
+        json.dump(config, f, indent=4)
+
+    # Side effects
+    public_key_pem = None
+
+    if wallet_changed:
+        public_key_pem = load_wallet(wallet_name)
+
+    if nickname_changed:
+        node_pubkey_flat = node_public_key_pem.replace("\n", "")
+        register_node_nickname(server_ip, server_port, node_pubkey_flat, node_nickname)
+
+    server_url = f"http://{server_ip}:{server_port}/submit_tx"
+
+    return server_ip, server_port, server_url, wallet_name, node_nickname, public_key_pem
+    
        
 # 1. Load or intitiaizle node ID (Critical Step)
 node_private_key, node_public_key_pem = load_or_init_node_ID()

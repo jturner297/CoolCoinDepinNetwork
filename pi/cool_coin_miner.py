@@ -267,8 +267,7 @@ def sub_menu():
             CONFIG_FILE,
             force_edit=True
             )
-
-      
+  
 
         elif choice == "2":
             

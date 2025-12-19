@@ -147,12 +147,13 @@ def load_or_init_node_ID():
 
 def load_config(config_file=CONFIG_FILE):
     """
-    Read config values from disk.
-    Returns None for missing values.
+    Read config from disk.
     """
+    
+    # Check whether this is the first time the program is running
     first_run = not os.path.exists(config_file)
 
-    # Register and Push node nickname to validator
+    # If this is NOT the first run
     if not first_run:
         with open(config_file, "r") as f: # open the existing config up
             config = json.load(f) #load JSON data from file
@@ -161,14 +162,7 @@ def load_config(config_file=CONFIG_FILE):
         config = {}
         
     # Current values
-    return (
-        first_run,
-        config,
-        config.get("server_ip"),
-        config.get("server_port"),
-        config.get("wallet_name"),
-        config.get("node_nickname"),
-    )
+    return first_run, config
 
 def load_wallet(wallet_name):
     """
@@ -202,9 +196,9 @@ def load_wallet(wallet_name):
     return public_key_pem # return the wallet address data
 
 
-def init_config(config_file=CONFIG_FILE):
+def init_config(node_public_key_pem, config_file=CONFIG_FILE):
     
-    print("\n--- Initial Node Setup ---\n") #banner
+    print("\n--- Initial Node Setup ---") #banner
 
     # prompt user
     server_ip = input("\nEnter validator server IP (e.g., 192.168.1.1): ").strip() 
@@ -372,14 +366,9 @@ def update_config(config_file=CONFIG_FILE):
     Interactively update config fields one-by-one.
     Only modifies fields the user explicitly chooses.
     """
-    (
-        first_run,
-        config,
-        server_ip,
-        server_port,
-        wallet_name,
-        node_nickname,
-    ) = load_config(config_file)
+    first_run, config = load_config(config_file)
+    
+    server_ip, server_port, server_url, wallet_name, node_nickname = get_config_values(config)
     
     nickname_changed = False
     wallet_changed   = False
@@ -428,15 +417,26 @@ def update_config(config_file=CONFIG_FILE):
 
     return server_ip, server_port, server_url, wallet_name, node_nickname, public_key_pem
     
-       
+def get_config_values(config):
+    server_ip     = config.get("server_ip")
+    server_port   = config.get("server_port")
+    wallet_name   = config.get("wallet_name")
+    node_nickname = config.get("node_nickname")
+
+    server_url = None
+    if server_ip and server_port:
+        server_url = f"http://{server_ip}:{server_port}/submit_tx"
+
+    return server_ip, server_port, server_url, wallet_name, node_nickname     
 # 1. Load or intitiaizle node ID (Critical Step)
 node_private_key, node_public_key_pem = load_or_init_node_ID()
 
-# 2. Load or initialize config
-config = load_config()
+# 2. Load config metadata
+first_run, config = load_config()
 
-# 3. Load wallet
-if config is None:
+# if config does not exist yet
+
+if first_run:  # Run first-time initialization
     (
         server_ip,
         server_port,
@@ -444,15 +444,10 @@ if config is None:
         wallet_name,
         node_nickname,
         public_key_pem
-    ) = init_config()
+    ) = init_config(node_public_key_pem)
 else:
-    (
-        server_ip,
-        server_port,
-        server_url,
-        wallet_name,
-        node_nickname
-    ) = config
+    server_ip, server_port, server_url, wallet_name, node_nickname = get_config_values(config)
+    server_url    = f"http://{server_ip}:{server_port}/submit_tx"
 
     public_key_pem = load_wallet(wallet_name)
 

@@ -77,6 +77,20 @@
         font-size: 0.8rem;
         text-align: left;
       }
+      .server-input-group {
+        display: flex;
+        gap: 6px;
+        width: 100%;
+      }
+
+      .server-input.address {
+        max-width: 110px;
+      }
+
+      .server-input.port {
+        max-width: 50px;
+        text-align: left;
+      }
 
       /* Logo Badge */
       .logo-img {
@@ -220,6 +234,68 @@
         line-height: 1.8;
         margin-top: 20px;
       }
+
+      #server-display {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+      }
+
+      #server-display {
+        background: #444;
+        border-radius: 20px;
+        padding: 4px 15px;
+      }
+      #server-display span {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #ccc;
+        font-size: 0.8rem;
+      }
+
+      #server-display button {
+        background: #444;
+        border: none;
+        border-radius: 12px;
+        padding: 2px 8px;
+        color: #ccc;
+        cursor: pointer;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.75rem;
+      }
+
+      #server-display button:hover {
+        background: #555;
+      }
+      #server-container {
+        width: 260px; /* fixed footprint */
+        height: 28px; /* fixed height */
+        display: flex;
+        align-items: center;
+      }
+      #server-container {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      #serverSubmitBtn {
+        background: var(--accent-purple);
+        border: none;
+        border-radius: 50px;
+        padding: 4px 10px;
+        color: #ccc;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.75rem;
+        cursor: pointer;
+      }
+
+      #serverSubmitBtn:hover {
+        background: #555;
+      }
     </style>
   </head>
   <body>
@@ -227,11 +303,26 @@
       <div class="header-left">
         <h1>Cool-Coin Network</h1>
         <p>Dashboard</p>
-        <input
-          type="text"
-          class="server-input"
-          placeholder="server address goes here"
-        />
+        <div id="server-container">
+          <div id="server-container">
+            <div class="server-input-group" id="server-edit">
+              <input
+                type="text"
+                id="serverAddress"
+                class="server-input address"
+                placeholder="address"
+              />
+              <input
+                type="text"
+                id="serverPort"
+                class="server-input port"
+                placeholder="port"
+              />
+            </div>
+
+            <button id="serverSubmitBtn">Set</button>
+          </div>
+        </div>
       </div>
       <img
         src="../_resources/CoolCoinLogo.png"
@@ -302,5 +393,55 @@
         </section>
       </main>
     </div>
+    <script>
+      let SERVER_URL = null;
+      let isEditing = true;
+
+      const container = document.getElementById("server-container");
+      const button = document.getElementById("serverSubmitBtn");
+
+      button.addEventListener("click", () => {
+        if (isEditing) {
+          const address = document.getElementById("serverAddress").value.trim();
+          const port = document.getElementById("serverPort").value.trim();
+
+          if (!address || !port) return;
+
+          SERVER_URL = `http://${address}:${port}`;
+          console.log("Server set to:", SERVER_URL);
+
+          container.querySelector("#server-edit").outerHTML = `
+        <div id="server-display">
+          <span>${SERVER_URL}</span>
+        </div>
+      `;
+
+          button.textContent = "Edit";
+          isEditing = false;
+        } else {
+          const [addr, prt] = SERVER_URL.replace("http://", "").split(":");
+
+          document.getElementById("server-display").outerHTML = `
+        <div class="server-input-group" id="server-edit">
+          <input
+            type="text"
+            id="serverAddress"
+            class="server-input address"
+            value="${addr}"
+          />
+          <input
+            type="text"
+            id="serverPort"
+            class="server-input port"
+            value="${prt}"
+          />
+        </div>
+      `;
+
+          button.textContent = "Set";
+          isEditing = true;
+        }
+      });
+    </script>
   </body>
 </html>

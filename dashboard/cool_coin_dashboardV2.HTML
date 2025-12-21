@@ -1,268 +1,288 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cool-Coin Network Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet">
-    
+    <!-- Sets the title of the web page, shown in browser tabs. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <!-- Preconnects to Google Fonts to speed up font loading. -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Another optimization for loading Google Fonts. 'crossorigin' allows the font to be used across domains. -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Imports the "DM Sans" font from Google Fonts so it can be used in the page. -->
+
     <style>
-        :root {
-            --header-bg: #000000;
-            --main-bg: #121212;
-            --sidebar-bg: #212121;
-            --card-bg: #2a2a2a;
-            --accent-purple: #d187f5;
-            --text-main: #ffffff;
-            --text-dim: #a0a0a0;
-            --online-green: #4caf50;
-            --offline-red: #f44336;
-            --logo-blue: #add8e6;
-        }
+      :root {
+        --header-bg: #000000;
+        --main-bg: #121212;
+        --sidebar-bg: #212121;
+        --card-bg: #2a2a2a;
+        --accent-purple: #e392fa;
+        --text-main: #ffffff;
+        --text-dim: #a0a0a0;
+        --online-green: #4caf50;
+        --offline-red: #f44336;
+        --logo-blue: #add8e6;
+      }
 
-        body {
-            font-family: 'DM Sans', sans-serif;
-            background-color: var(--main-bg);
-            color: var(--text-main);
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
+      body {
+        font-family: "DM Sans", sans-serif;
+        background-color: var(--main-bg);
+        color: var(--text-main);
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
 
-        /* Top Black Header */
-        header {
-            background-color: var(--header-bg);
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 10;
-        }
+      /* Top Black Header */
+      header {
+        background-color: var(--header-bg);
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 10;
+      }
 
-        .header-left h1 {
-            color: var(--accent-purple);
-            margin: 0;
-            font-size: 1.6rem;
-            font-weight: 700;
-        }
+      .header-left h1 {
+        color: var(--accent-purple);
+        margin: 0;
+        font-size: 1.6rem;
+        font-weight: 700;
+      }
 
-        .header-left p {
-            margin: 0;
-            font-size: 0.95rem;
-            font-weight: 500;
-            color: var(--text-main);
-            margin-bottom: 8px;
-        }
+      .header-left p {
+        margin: 0;
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: var(--text-main);
+        margin-bottom: 8px;
+      }
 
-        .server-input {
-            background: #444;
-            border: none;
-            border-radius: 20px;
-            padding: 4px 15px;
-            color: #ccc;
-            font-family: 'DM Sans', sans-serif;
-            width: 220px;
-            font-size: 0.8rem;
-            text-align: center;
-        }
+      .server-input {
+        background: #444;
+        border: none;
+        border-radius: 20px;
+        padding: 4px 15px;
+        color: #ccc;
+        font-family: "DM Sans", sans-serif;
+        width: 220px;
+        font-size: 0.8rem;
+        text-align: center;
+      }
 
-        /* Logo Badge */
-        .logo-badge {
-            width: 55px;
-            height: 55px;
-            background: var(--logo-blue);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: #2c7da0; /* Darker blue for the letter */
-            font-weight: 900;
-            font-size: 1.8rem;
-            position: relative;
-            /* Simple representation of the scalloped edge */
-            outline: 3px dashed var(--logo-blue);
-            outline-offset: 4px;
-        }
+      /* Logo Badge */
+      .logo-img {
+        width: 80px; /* Same size as old badge */
+        height: 80px; /* Same height */
+      }
 
-        /* Dashboard Body Layout */
-        .layout {
-            display: flex;
-            flex: 1;
-        }
+      /* Dashboard Body Layout */
+      .layout {
+        display: flex;
+        flex: 1;
+      }
 
-        /* Sidebar Nodes */
-        aside {
-            width: 250px;
-            background-color: var(--sidebar-bg);
-            padding: 30px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
+      /* Sidebar Nodes */
+      aside {
+        width: 250px;
+        background-color: var(--sidebar-bg);
+        padding: 30px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
 
-        aside h3 {
-            color: var(--accent-purple);
-            margin: 0 0 10px 0;
-            font-weight: 500;
-        }
+      aside h3 {
+        color: var(--accent-purple);
+        margin: 0 0 10px 0;
+        font-weight: 500;
+      }
 
-        .node-card {
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+      .node-card {
+        background: var(--card-bg);
+        padding: 15px;
+        border-radius: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
 
-        .status-online { color: var(--online-green); font-size: 0.75rem; }
-        .status-offline { color: var(--offline-red); font-size: 0.75rem; }
+      .status-online {
+        color: var(--online-green);
+        font-size: 0.75rem;
+      }
+      .status-offline {
+        color: var(--offline-red);
+        font-size: 0.75rem;
+      }
 
-        .btn-add {
-            background: var(--card-bg);
-            border: none;
-            color: white;
-            padding: 15px;
-            border-radius: 12px;
-            font-size: 1.5rem;
-            cursor: pointer;
-        }
+      .btn-add {
+        background: var(--card-bg);
+        border: none;
+        color: white;
+        padding: 15px;
+        border-radius: 12px;
+        font-size: 1.5rem;
+        cursor: pointer;
+      }
 
-        /* Main Dashboard Content */
-        main {
-            flex: 1;
-            padding: 40px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-gap: 30px;
-            overflow-y: auto;
-        }
+      /* Main Dashboard Content */
+      main {
+        display: grid;
+        grid-template-columns: 440px 1fr; /* left section fixed, right section fills remaining */
+        grid-gap: 30px; /* space between left and right columns */
+        padding: 0px 40px; /* optional: reduce top padding so sections start higher */
+      }
+      .stat-card,
+      .wallet-card {
+        max-width: 100%; /* they stay within the 320px column */
+      }
 
-        section h2 {
-            color: var(--accent-purple);
-            font-weight: 400;
-            font-size: 1.3rem;
-            margin-bottom: 20px;
-        }
+      section h2 {
+        color: var(--accent-purple);
+        font-weight: 400;
+        font-size: 1.3rem;
+        margin-bottom: 20px;
+      }
 
-        .stat-card {
-            background: var(--card-bg);
-            padding: 25px;
-            border-radius: 15px;
-            margin-bottom: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+      .stat-card {
+        background: var(--card-bg);
+        padding: 17px;
+        border-radius: 15px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
 
-        .stat-label { color: var(--text-dim); font-size: 1.8rem; }
-        .stat-value { font-size: 2.2rem; font-weight: 500; }
+      .stat-label {
+        color: var(--text-dim);
+        font-size: 1.8rem;
+      }
+      .stat-value {
+        font-size: 2.2rem;
+        font-weight: 500;
+      }
 
-        .trends-graph-placeholder {
-            background: var(--card-bg);
-            border-radius: 20px;
-            height: 340px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            color: #f6c445; /* Yellow/Gold text from image */
-            padding: 40px;
-            font-size: 1.2rem;
-            line-height: 1.4;
-        }
+      .trends-graph-placeholder {
+        background: var(--card-bg);
+        border-radius: 20px;
+        height: 200px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        color: #f6c445; /* Yellow/Gold text from image */
+        padding: 40px;
+        font-size: 1.2rem;
+        line-height: 1.4;
+      }
 
-        .wallet-card {
-            background: var(--card-bg);
-            padding: 30px;
-            border-radius: 20px;
-            height: 250px;
-        }
+      .wallet-card {
+        background: var(--card-bg);
+        padding: 30px;
+        border-radius: 20px;
+        height: 100px;
+      }
 
-        .wallet-input {
-            width: 100%;
-            background: #e0e0e0;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 20px;
-            font-family: 'DM Sans', sans-serif;
-            box-sizing: border-box;
-        }
+      .wallet-input {
+        width: 100%;
+        background: #e0e0e0;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-family: "DM Sans", sans-serif;
+        box-sizing: border-box;
+      }
 
-        .details-text {
-            color: var(--text-dim);
-            font-size: 0.9rem;
-            line-height: 1.8;
-            margin-top: 20px;
-        }
-
+      .details-text {
+        color: var(--text-dim);
+        font-size: 0.9rem;
+        line-height: 1.8;
+        margin-top: 20px;
+      }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <header>
-        <div class="header-left">
-            <h1>Cool-Coin Network</h1>
-            <p>Dashboard</p>
-            <input type="text" class="server-input" placeholder="server address goes here">
-        </div>
-        <div class="logo-badge">C</div>
+      <div class="header-left">
+        <h1>Cool-Coin Network</h1>
+        <p>Dashboard</p>
+        <input
+          type="text"
+          class="server-input"
+          placeholder="server address goes here"
+        />
+      </div>
+      <img
+        src="../_resources/CoolCoinLogo.png"
+        alt="Cool-Coin Logo"
+        class="logo-img"
+      />
     </header>
 
     <div class="layout">
-        <aside>
-            <h3>Nodes</h3>
-            <div class="node-card">
-                <span>Justin</span>
-                <span class="status-online">Online</span>
-            </div>
-            <div class="node-card">
-                <span>LivingRoomNode</span>
-                <span class="status-offline">Offline</span>
-            </div>
-            <button class="btn-add">+</button>
-        </aside>
+      <aside>
+        <h3>Nodes</h3>
+        <div class="node-card">
+          <span>Justin</span>
+          <span class="status-online">Online</span>
+        </div>
+        <div class="node-card">
+          <span>LivingRoomNode</span>
+          <span class="status-offline">Offline</span>
+        </div>
+        <button class="btn-add">+</button>
+      </aside>
 
-        <main>
-            <section>
-                <h2>Live Environmental Statistics</h2>
-                <div class="stat-card">
-                    <span class="stat-label">Temperature</span>
-                    <span class="stat-value">22.6 °C</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Pressure</span>
-                    <span class="stat-value">1013 hpa</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Humidity</span>
-                    <span class="stat-value">41%</span>
-                </div>
+      <main>
+        <section>
+          <h2>Live Environmental Statistics</h2>
+          <div class="stat-card">
+            <span class="stat-label">Temperature</span>
+            <span class="stat-value">22.6 °C</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Pressure</span>
+            <span class="stat-value">1013 hpa</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Humidity</span>
+            <span class="stat-value">41%</span>
+          </div>
 
-                <h2>Check Wallet Balance</h2>
-                <div class="wallet-card">
-                    <input type="text" class="wallet-input" placeholder="Paste public key to track wallet">
-                </div>
-            </section>
+          <h2>Check Wallet Balance</h2>
+          <div class="wallet-card">
+            <input
+              type="text"
+              class="wallet-input"
+              placeholder="Paste public key to track wallet"
+            />
+          </div>
+        </section>
 
-            <section>
-                <h2>Trends</h2>
-                <div class="trends-graph-placeholder">
-                    <strong>Put a graph showing<br>temp history/trends<br>here</strong>
-                </div>
-                <div class="details-text">
-                    Details<br>
-                    node name:<br>
-                    uptime:<br>
-                    last validation time:
-                </div>
-            </section>
-        </main>
+        <section>
+          <h2>Trends</h2>
+          <div class="trends-graph-placeholder">
+            <strong
+              >Put a graph showing<br />temp history/trends<br />here</strong
+            >
+          </div>
+          <div class="details-text">
+            Details<br />
+            node name:<br />
+            uptime:<br />
+            last validation time:
+          </div>
+        </section>
+      </main>
     </div>
-
-</body>
+  </body>
 </html>

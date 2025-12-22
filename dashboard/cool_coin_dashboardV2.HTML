@@ -108,14 +108,13 @@
         width: 250px;
         background-color: var(--sidebar-bg);
         padding: 30px 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
       }
 
       aside h3 {
         color: var(--accent-purple);
-        margin: -15px 0 10px 0;
+
+        margin-top: -21px;
+        margin-bottom: -6px;
         font-weight: 800;
       }
 
@@ -125,11 +124,14 @@
         border-radius: 12px;
         display: block; /* stack naturally */
         margin-top: 10px; /* spacing between cards */
+      }
+      .node-card:not(.node-input-card) {
         cursor: pointer;
       }
 
-      .node-input-card {
-        margin-top: 0px; /* input always at top */
+      /* Force the input to always be text cursor */
+      .node-input-card .node-input {
+        cursor: text;
       }
 
       .node-input-card .node-input {
@@ -169,7 +171,7 @@
         color: var(--accent-purple);
         font-weight: 800;
         font-size: 1.3rem;
-        margin-bottom: 20px;
+        margin-bottom: 5px;
       }
 
       .stat-card {
@@ -332,25 +334,8 @@
         </div>
 
         <!-- Node list container -->
-        <div id="node-list-wrapper" style="position: relative">
-          <div id="node-list">
-            <!-- Dynamically added nodes go here -->
-          </div>
-
-          <!-- Trash container fixed on the right of the node list -->
-          <div
-            id="trash-container"
-            style="
-              position: absolute;
-              top: 0;
-              right: -25px;
-              display: flex;
-              flex-direction: column;
-              gap: 10px;
-            "
-          >
-            <!-- Trash buttons will align here -->
-          </div>
+        <div id="node-list">
+          <!-- Dynamically added nodes will go here -->
         </div>
       </aside>
 
@@ -507,7 +492,6 @@
           }
         }
       });
-      renderNodes(); // initial render
     </script>
   </body>
 </html>

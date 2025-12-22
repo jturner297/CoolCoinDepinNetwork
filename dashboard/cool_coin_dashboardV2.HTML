@@ -53,17 +53,19 @@
 
       .header-left h1 {
         color: var(--accent-purple);
-        margin: 0;
         font-size: 1.6rem;
         font-weight: 1000;
+
+        margin-top: 0px;
+        margin-bottom: -3px;
       }
 
       .header-left p {
-        margin: 0;
         font-size: 0.95rem;
         font-weight: 500;
         color: var(--text-main);
-        margin-bottom: 8px;
+        margin-top: 0px;
+        margin-bottom: 10px;
       }
 
       .server-input {
@@ -73,23 +75,20 @@
         padding: 4px 15px;
         color: #ccc;
         font-family: "DM Sans", sans-serif;
-        width: 220px;
         font-size: 0.8rem;
         text-align: left;
       }
       .server-input-group {
-        display: flex;
-        gap: 6px;
-        width: 100%;
+        width: 200px; /* fixed*/
       }
 
       .server-input.address {
-        max-width: 110px;
+        width: 75px; /* fixed width */
+        margin-right: 5px;
       }
 
       .server-input.port {
-        max-width: 50px;
-        text-align: left;
+        width: 50px; /* fixed width */
       }
 
       /* Logo Badge */
@@ -240,9 +239,6 @@
         align-items: center;
         gap: 6px;
         width: 100%;
-      }
-
-      #server-display {
         background: #444;
         border-radius: 20px;
         padding: 4px 15px;
@@ -271,15 +267,13 @@
         background: #555;
       }
       #server-container {
-        width: 260px; /* fixed footprint */
-        height: 28px; /* fixed height */
-        display: flex;
-        align-items: center;
-      }
-      #server-container {
+        width: 245px;
+        height: 28px;
         display: flex;
         align-items: center;
         gap: 6px;
+        margin-top: 0px;
+        margin-bottom: -5px;
       }
 
       #serverSubmitBtn {
@@ -287,7 +281,7 @@
         border: none;
         border-radius: 50px;
         padding: 4px 10px;
-        color: #ccc;
+        color: #ffffff;
         font-family: "DM Sans", sans-serif;
         font-size: 0.75rem;
         cursor: pointer;
@@ -304,24 +298,21 @@
         <h1>Cool-Coin Network</h1>
         <p>Dashboard</p>
         <div id="server-container">
-          <div id="server-container">
-            <div class="server-input-group" id="server-edit">
-              <input
-                type="text"
-                id="serverAddress"
-                class="server-input address"
-                placeholder="address"
-              />
-              <input
-                type="text"
-                id="serverPort"
-                class="server-input port"
-                placeholder="port"
-              />
-            </div>
-
-            <button id="serverSubmitBtn">Set</button>
+          <div class="server-input-group" id="server-edit">
+            <input
+              type="text"
+              id="serverAddress"
+              class="server-input address"
+              placeholder="address"
+            />
+            <input
+              type="text"
+              id="serverPort"
+              class="server-input port"
+              placeholder="port"
+            />
           </div>
+          <button id="serverSubmitBtn">Set</button>
         </div>
       </div>
       <img

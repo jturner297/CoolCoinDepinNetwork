@@ -123,11 +123,27 @@
         background: var(--node-card-bg);
         padding: 15px;
         border-radius: 12px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        display: block; /* stack naturally */
+        margin-top: 10px; /* spacing between cards */
+        cursor: pointer;
       }
 
+      .node-input-card {
+        margin-top: 0px; /* input always at top */
+      }
+
+      .node-input-card .node-input {
+        background: transparent;
+        border: none;
+        color: #ccc;
+        width: 100%;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.85rem;
+      }
+
+      .node-input-card .node-input:focus {
+        outline: none;
+      }
       .status-online {
         color: var(--online-green);
         font-size: 0.75rem;
@@ -135,27 +151,6 @@
       .status-offline {
         color: var(--offline-red);
         font-size: 0.75rem;
-      }
-
-      .node-input-card {
-        padding: 15px; /* match other node-card padding */
-      }
-
-      .node-input-card .node-input {
-        background: transparent; /* transparent so card background shows */
-        border: none; /* no default input border */
-        color: #ccc; /* light text */
-        width: 100%; /* fill card horizontally */
-        font-family: "DM Sans", sans-serif;
-        font-size: 0.85rem;
-        text-align: left; /* match other node text */
-        display: flex; /* same as .node-card */
-        align-items: center; /* vertical alignment */
-        justify-content: flex-start; /* same left alignment as other node names */
-      }
-
-      .node-input-card .node-input:focus {
-        outline: none; /* remove default focus border */
       }
 
       /* Main Dashboard Content */
@@ -325,20 +320,37 @@
     <div class="layout">
       <aside>
         <h3>Nodes</h3>
-        <div class="node-card">
-          <span>Justin</span>
-          <span class="status-online">Online</span>
-        </div>
-        <div class="node-card">
-          <span>LivingRoomNode</span>
-          <span class="status-offline">Offline</span>
-        </div>
+
+        <!-- Node input stays at top -->
         <div class="node-card node-input-card">
           <input
             type="text"
             class="node-input"
+            id="nodeInput"
             placeholder="Type Node ID or Nickname"
           />
+        </div>
+
+        <!-- Node list container -->
+        <div id="node-list-wrapper" style="position: relative">
+          <div id="node-list">
+            <!-- Dynamically added nodes go here -->
+          </div>
+
+          <!-- Trash container fixed on the right of the node list -->
+          <div
+            id="trash-container"
+            style="
+              position: absolute;
+              top: 0;
+              right: -25px;
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+            "
+          >
+            <!-- Trash buttons will align here -->
+          </div>
         </div>
       </aside>
 
@@ -433,6 +445,69 @@
           isEditing = true;
         }
       });
+
+      const MAX_NODES = 3;
+      let trackedNodes = [];
+      let activeNode = null;
+
+      const nodeList = document.getElementById("node-list");
+      const nodeInput = document.getElementById("nodeInput");
+
+      function renderNodes() {
+        nodeList.innerHTML = ""; // clear existing nodes
+
+        trackedNodes.forEach((node, idx) => {
+          const card = document.createElement("div");
+          card.className = "node-card";
+          if (activeNode === idx) card.style.outline = "2px solid #e392fa"; // purple outline
+
+          const spanName = document.createElement("span");
+          spanName.textContent = node;
+
+          const trash = document.createElement("span");
+          trash.textContent = "✕";
+          trash.style.cursor = "pointer";
+          trash.style.marginLeft = "10px";
+          trash.onclick = (e) => {
+            e.stopPropagation();
+            trackedNodes.splice(idx, 1);
+            if (activeNode === idx) activeNode = null;
+            renderNodes();
+          };
+
+          card.appendChild(spanName);
+          card.appendChild(trash);
+
+          card.onclick = () => {
+            activeNode = idx;
+            renderNodes();
+          };
+
+          nodeList.appendChild(card);
+        });
+
+        // Disable input if max nodes reached
+        if (trackedNodes.length >= MAX_NODES) {
+          nodeInput.disabled = true;
+          nodeInput.placeholder = "Max nodes reached";
+        } else {
+          nodeInput.disabled = false;
+          nodeInput.placeholder = "Type Node ID or Nickname";
+        }
+      }
+
+      nodeInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          const val = nodeInput.value.trim();
+          if (val && trackedNodes.length < MAX_NODES) {
+            trackedNodes.push(val);
+            activeNode = trackedNodes.length - 1;
+            nodeInput.value = "";
+            renderNodes();
+          }
+        }
+      });
+      renderNodes(); // initial render
     </script>
   </body>
 </html>

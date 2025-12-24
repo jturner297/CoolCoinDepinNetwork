@@ -282,10 +282,40 @@ Core Principles:
       }
 
       .details-text {
-        color: var(--text-dim);
-        font-size: 0.9rem;
-        line-height: 1.8;
         margin-top: 20px;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+
+      .details-header {
+        margin: 0 0 8px 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #ffffff;
+      }
+
+      .detail-row {
+        display: flex;
+        gap: 8px; /* Space between label and value */
+        margin-bottom: 2px;
+      }
+
+      .detail-label {
+        color: #ffffff; /* White label */
+      }
+
+      .detail-val-purple {
+        color: #e392fa;
+      }
+      .detail-val-red {
+        color: #ff0059;
+      }
+      .detail-val-green {
+        color: #00ff55;
+      }
+      .detail-val-white {
+        color: #ffffff;
       }
 
       #server-display {
@@ -542,14 +572,17 @@ Core Principles:
       let SERVER_URL = null;
       let isEditing = true;
       const MAX_NODES = 3;
-      let trackedNodes = [];
-      let activeNode = null;
 
-      // Cache the latest smoothed data so we can switch tabs without re-fetching
+      // trackedNodes stores ONLY the immutable Public Keys
+      let trackedNodes = [];
+
+      // nodeNameCache maps Public Keys -> Current Nicknames
+      // Example: { "MCow...": "jtpi" }
+      let nodeNameCache = {};
+
+      let activeNode = null;
       let cachedChartData = [];
       let lastFetchSuccessful = false;
-
-      // Chart Global
       let myChart = null;
       let currentMode = "temp";
 
@@ -591,16 +624,11 @@ Core Principles:
           .replace(/\s+/g, "");
       }
 
-      // Helper to generate gradient to avoid code repetition
       function createGradient(ctx, color) {
         const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-        // Convert hex to rgba for the fade effect
-        // Note: Simple hack for the specific colors you use.
-        // Ideally use a hex-to-rgb converter, but hardcoding for optimization here is fine.
         let baseColor = "rgba(227, 146, 250,"; // Default Purple
         if (color === "#add8e6") baseColor = "rgba(173, 216, 230,"; // Blue
         if (color === "#00ff55") baseColor = "rgba(0, 255, 85,"; // Green
-
         gradient.addColorStop(0, `${baseColor} 0.5)`);
         gradient.addColorStop(1, `${baseColor} 0.0)`);
         return gradient;
@@ -616,30 +644,21 @@ Core Principles:
 
       serverBtn.addEventListener("click", () => {
         if (isEditing) {
-          // SAVE ACTION
           const address = document.getElementById("serverAddress").value.trim();
           const port = document.getElementById("serverPort").value.trim();
           if (!address || !port) return;
-
           SERVER_URL = `http://${address}:${port}`;
           console.log("Server set to:", SERVER_URL);
-
-          // Toggle UI
           serverUrlSpan.textContent = SERVER_URL;
           serverEditDiv.style.display = "none";
           serverDisplayDiv.style.display = "flex";
           serverBtn.textContent = "Edit";
           isEditing = false;
-
-          // Immediate fetch
           updateActiveNodeStats();
         } else {
-          // EDIT ACTION
           const [addr, prt] = SERVER_URL.replace("http://", "").split(":");
           document.getElementById("serverAddress").value = addr || "";
           document.getElementById("serverPort").value = prt || "";
-
-          // Toggle UI
           serverDisplayDiv.style.display = "none";
           serverEditDiv.style.display = "flex";
           serverBtn.textContent = "Set";
@@ -648,20 +667,26 @@ Core Principles:
       });
 
       // ==========================================
-      // UI: NODE MANAGEMENT
+      // UI: NODE MANAGEMENT (SIDEBAR)
       // ==========================================
       const nodeList = document.getElementById("node-list");
       const nodeInput = document.getElementById("nodeInput");
 
       function renderNodes() {
         nodeList.innerHTML = "";
-        trackedNodes.forEach((node, idx) => {
+        trackedNodes.forEach((key, idx) => {
           const card = document.createElement("div");
           card.className = "node-card";
           if (activeNode === idx) card.style.outline = "2px solid #e392fa";
 
           const spanName = document.createElement("span");
-          spanName.textContent = node;
+
+          // LOOKUP: Check cache for a friendly name. If none, truncate the key.
+          const friendlyName = nodeNameCache[key]
+            ? nodeNameCache[key]
+            : key.substring(0, 12) + "...";
+
+          spanName.textContent = friendlyName;
 
           const trash = document.createElement("span");
           trash.textContent = "✕";
@@ -671,9 +696,9 @@ Core Principles:
             trackedNodes.splice(idx, 1);
             if (activeNode === idx) {
               activeNode = null;
-              resetStats("--");
+              resetStats("EMPTY");
             } else if (activeNode > idx) {
-              activeNode--; // Shift active index if we deleted a node above it
+              activeNode--;
             }
             renderNodes();
           };
@@ -696,21 +721,56 @@ Core Principles:
           nodeInput.placeholder = "Max nodes reached";
         } else {
           nodeInput.disabled = false;
-          nodeInput.placeholder = "Paste Node Public Key";
-          nodeInput.focus();
+          nodeInput.placeholder = "Type Node ID or Nickname";
         }
       }
 
-      nodeInput.addEventListener("keydown", (e) => {
+      // Search Logic: Resolves Names -> Keys
+      nodeInput.addEventListener("keydown", async (e) => {
         if (e.key === "Enter") {
           const val = nodeInput.value.trim();
-          if (val && trackedNodes.length < MAX_NODES) {
-            trackedNodes.push(val);
-            activeNode = trackedNodes.length - 1;
-            nodeInput.value = "";
-            renderNodes();
-            updateActiveNodeStats();
+          if (!val) return;
+          if (trackedNodes.length >= MAX_NODES) return;
+
+          nodeInput.disabled = true;
+          nodeInput.placeholder = "Searching...";
+
+          let finalKey = val;
+
+          // 1. Try to resolve nickname via Server
+          if (SERVER_URL) {
+            try {
+              const res = await fetch(
+                `${SERVER_URL}/resolve_nickname/${encodeURIComponent(val)}`
+              );
+              if (res.ok) {
+                const data = await res.json();
+                if (data.status === "found") {
+                  // It's a valid nickname!
+                  finalKey = data.pubkey;
+                  // Update cache immediately so it shows up nice in the list
+                  nodeNameCache[finalKey] = data.nickname;
+                }
+              }
+            } catch (err) {
+              console.warn("Could not resolve nickname, using raw input.");
+            }
           }
+
+          // 2. Add to list (Prevent Duplicates)
+          if (trackedNodes.includes(finalKey)) {
+            alert("Node is already on the dashboard.");
+          } else {
+            trackedNodes.push(finalKey);
+            activeNode = trackedNodes.length - 1;
+            renderNodes(); // Re-render sidebar to show new node
+            updateActiveNodeStats(); // Fetch data immediately
+          }
+
+          nodeInput.value = "";
+          nodeInput.disabled = false;
+          nodeInput.placeholder = "Type Node ID or Nickname";
+          nodeInput.focus();
         }
       });
 
@@ -760,17 +820,13 @@ Core Principles:
         });
       }
 
-      // Switch Mode (Temp / Hum / Pres)
-      // OPTIMIZED: Does NOT fetch data. Only re-renders from cache.
       function setGraphMode(mode) {
-        if (currentMode === mode) return; // No op if clicking same tab
+        if (currentMode === mode) return;
         currentMode = mode;
-
         const config = MODES[mode];
         const dataset = myChart.data.datasets[0];
         const yScale = myChart.options.scales.y;
 
-        // 1. Update Buttons
         document.querySelectorAll(".graph-tabs .tab").forEach((btn) => {
           btn.classList.remove("active");
           if (
@@ -788,7 +844,6 @@ Core Principles:
           }
         });
 
-        // 2. Update Visuals
         dataset.label = config.label;
         dataset.borderColor = config.color;
         dataset.pointBackgroundColor = config.color;
@@ -804,7 +859,6 @@ Core Principles:
           dataset.backgroundColor = config.color;
         }
 
-        // 3. Update Scale
         if (mode === "pres") {
           delete yScale.min;
           delete yScale.max;
@@ -814,28 +868,21 @@ Core Principles:
           yScale.max = Y_SCALES[mode].max;
           yScale.ticks.stepSize = Y_SCALES[mode].step;
         }
-
-        // 4. Re-draw data from cache without fetching
         renderChartFromCache();
       }
 
-      // Renders the chart using the data currently stored in `cachedChartData`
       function renderChartFromCache() {
         if (!myChart || cachedChartData.length === 0) return;
-
-        // Extract correct property based on mode
-        const plotData = cachedChartData.map((h) => h[currentMode]); // h.temp, h.pres, or h.hum
+        const plotData = cachedChartData.map((h) => h[currentMode]);
         const labels = cachedChartData.map((h) => h.timeStr.split(" ")[1]);
 
         myChart.data.labels = labels;
         myChart.data.datasets[0].data = plotData;
 
-        // Update Min/Max Text
         if (plotData.length > 0) {
           const high = Math.max(...plotData);
           const low = Math.min(...plotData);
           const unit = MODES[currentMode].unit;
-
           document.getElementById("highVal").textContent = `${high.toFixed(
             1
           )}${unit}`;
@@ -843,41 +890,92 @@ Core Principles:
             1
           )}${unit}`;
         }
-
         myChart.update();
       }
 
       // ==========================================
-      // DATA FETCHING (Logic Layer)
+      // DATA FETCHING & UI UPDATE
       // ==========================================
-      async function updateActiveNodeStats() {
-        if (!SERVER_URL) return;
-        if (activeNode === null || !trackedNodes[activeNode]) {
-          resetStats("--");
+      function renderDetailsPanel(state, data) {
+        const container = document.querySelector(".details-text");
+        if (state === "EMPTY") {
+          container.innerHTML = "";
           return;
         }
 
-        const targetNodeID = cleanKey(trackedNodes[activeNode]);
-        const MIN_TIME_GAP = 30 * 1000;
+        const { id, lastSync, windowTxt, nodeName } = data;
+        let nameHtml, statusHtml, syncHtml, windowHtml;
+
+        // Name Logic: "unknown" or empty -> Red. Otherwise -> Purple
+        if (!nodeName || nodeName.toLowerCase() === "unknown") {
+          nameHtml = `<span class="detail-val-red">unknown</span>`;
+        } else {
+          nameHtml = `<span class="detail-val-purple">${nodeName}</span>`;
+        }
+
+        if (state === "OFFLINE") {
+          statusHtml = `<span class="detail-val-red">Offline</span>`;
+          syncHtml = `<span class="detail-val-white">N/A</span>`;
+          windowHtml = `<span class="detail-val-white">N/A</span>`;
+        } else {
+          statusHtml = `<span class="detail-val-green">Online</span>`;
+          syncHtml = `<span class="detail-val-white">${lastSync}</span>`;
+          windowHtml = `<span class="detail-val-white">${windowTxt}</span>`;
+        }
+
+        container.innerHTML = `
+          <h3 class="details-header">Details</h3>
+          <div class="detail-row"><span class="detail-label">Node name:</span>${nameHtml}</div>
+          <div class="detail-row"><span class="detail-label">Node ID:</span><span class="detail-val-white" style="word-break: break-all;">${id}</span></div>
+          <div class="detail-row"><span class="detail-label">Status:</span>${statusHtml}</div>
+          <div class="detail-row"><span class="detail-label">last sync:</span>${syncHtml}</div>
+          <div class="detail-row"><span class="detail-label">Trend Window:</span>${windowHtml}</div>
+        `;
+      }
+
+      async function updateActiveNodeStats() {
+        if (!SERVER_URL) return;
+        if (activeNode === null || !trackedNodes[activeNode]) {
+          resetStats("EMPTY");
+          return;
+        }
+
+        const currentNodeRaw = trackedNodes[activeNode];
+        const cleanID = cleanKey(currentNodeRaw); // <--- We use this for the URL now
+        const MIN_TIME_GAP = 0;
 
         try {
-          const [chainRes, mempoolRes] = await Promise.all([
+          // 1. Fetch Chain, Mempool, AND Nickname
+          // CHANGE: We now pass 'cleanID' to the server, not the messy 'currentNodeRaw'
+          const [chainRes, mempoolRes, nameRes] = await Promise.all([
             fetch(`${SERVER_URL}/chain`),
             fetch(`${SERVER_URL}/mempool`),
+            fetch(`${SERVER_URL}/node_nickname/${encodeURIComponent(cleanID)}`),
           ]);
-
           if (!chainRes.ok || !mempoolRes.ok) throw new Error("Server Error");
-
           const chain = await chainRes.json();
           const mempool = await mempoolRes.json();
 
-          let rawHistory = [];
+          // 2. Process & Update Name Cache
+          let fetchedName = "unknown";
+          if (nameRes.ok) {
+            const nameJson = await nameRes.json();
+            if (nameJson.status === "found") {
+              fetchedName = nameJson.nickname;
+              // CRITICAL: Update the global cache
+              nodeNameCache[currentNodeRaw] = fetchedName;
+            }
+          }
 
-          // Helper to parse tx
+          // 3. Re-render the sidebar to reflect any name changes
+          renderNodes();
+
+          // 4. Process Chain Data
+          let rawHistory = [];
           const processTx = (tx) => {
             if (
               tx.type === "MINT" &&
-              cleanKey(tx.from_addr) === targetNodeID &&
+              cleanKey(tx.from_addr) === cleanID &&
               tx.reading
             ) {
               const cleanTimeStr = tx.timestamp.replace(" UTC", "");
@@ -890,17 +988,12 @@ Core Principles:
               });
             }
           };
-
           chain.forEach((block) => block.transactions.forEach(processTx));
           mempool.forEach(processTx);
-
-          // Sort
           rawHistory.sort((a, b) => a.timeObj - b.timeObj);
 
-          // Smooth (Downsample)
           const smoothHistory = [];
           let lastAddedTime = 0;
-
           rawHistory.forEach((point) => {
             const pointTime = point.timeObj.getTime();
             if (pointTime - lastAddedTime >= MIN_TIME_GAP) {
@@ -909,13 +1002,11 @@ Core Principles:
             }
           });
 
-          // UPDATE GLOBAL CACHE (Last 20 points)
-          cachedChartData = smoothHistory.slice(-20);
-
-          // Update Live Text Stats (use absolute latest real reading, not smoothed)
+          cachedChartData = smoothHistory.slice(-60);
           const latestReal = rawHistory[rawHistory.length - 1];
 
           if (latestReal) {
+            // ONLINE
             document.getElementById(
               "tempDisplay"
             ).textContent = `${latestReal.temp.toFixed(2)} °C`;
@@ -926,41 +1017,35 @@ Core Principles:
               "humDisplay"
             ).textContent = `${latestReal.hum.toFixed(2)} %`;
 
-            // Update Details Footer
-            const detailsBox = document.querySelector(".details-text");
-            if (detailsBox) {
-              detailsBox.innerHTML = `
-                Details<br>
-                Last Sync: ${latestReal.timeStr}<br>
-                Trend Window: ~${(cachedChartData.length * 30) / 60} Minutes<br>
-                Status: <span style="color:#00ff55">Online</span>
-            `;
-            }
-
-            // Render the graph with the new data
+            renderDetailsPanel("ONLINE", {
+              id: currentNodeRaw,
+              lastSync: latestReal.timeStr,
+              windowTxt: `${Math.round(
+                (cachedChartData.length * 30) / 60
+              )} minutes`,
+              nodeName: fetchedName,
+            });
             renderChartFromCache();
-            lastFetchSuccessful = true;
           } else {
-            resetStats("No Data");
+            // OFFLINE
+            resetTopStats("Offline");
+            renderDetailsPanel("OFFLINE", {
+              id: currentNodeRaw,
+              nodeName: fetchedName,
+            });
           }
         } catch (err) {
           console.error("Fetch failed:", err);
-          // Optional: Visual cue for offline
-          if (lastFetchSuccessful) {
-            // Only reset if we previously had data, otherwise keep "No Data"
-            resetStats("Offline");
-          }
-          lastFetchSuccessful = false;
+          resetStats("OFFLINE");
         }
       }
 
-      function resetStats(msg) {
+      function resetTopStats(msg) {
         document.getElementById("tempDisplay").textContent = msg;
         document.getElementById("presDisplay").textContent = msg;
         document.getElementById("humDisplay").textContent = msg;
         document.getElementById("highVal").textContent = "--";
         document.getElementById("lowVal").textContent = "--";
-        // Clear chart
         cachedChartData = [];
         if (myChart) {
           myChart.data.labels = [];
@@ -969,10 +1054,26 @@ Core Principles:
         }
       }
 
+      function resetStats(mode) {
+        const msg = mode === "EMPTY" ? "--" : "Offline";
+        resetTopStats(msg);
+        if (mode === "EMPTY") {
+          renderDetailsPanel("EMPTY", {});
+        } else {
+          const currentID =
+            activeNode !== null && trackedNodes[activeNode]
+              ? trackedNodes[activeNode]
+              : "Unknown";
+          // Try to get name from cache if we have it
+          const name = nodeNameCache[currentID] || "unknown";
+          renderDetailsPanel("OFFLINE", { id: currentID, nodeName: name });
+        }
+      }
+
       // Initialize
       initChart();
       setGraphMode(currentMode);
-      // Start loop
+      renderNodes();
       setInterval(updateActiveNodeStats, 2000);
     </script>
   </body>

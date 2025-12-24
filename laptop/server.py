@@ -90,6 +90,14 @@ def load_state():
 NICKNAME_FILE = "node_nicknames.json"  # File where node nicknames are stored persistently
 node_nicknames = {}  # In-memory dictionary mapping node public keys (PEM) to nicknames
 
+# Helper to clean keys for comparison (Removes headers and whitespace)
+def normalize_key(key_str):
+    if not key_str: return ""
+    return key_str.replace("-----BEGIN PUBLIC KEY-----", "") \
+                  .replace("-----END PUBLIC KEY-----", "") \
+                  .replace("\n", "") \
+                  .replace(" ", "")
+
 # Save nicknames to file
 def save_nicknames():
     with open(NICKNAME_FILE, "w") as f:  # open in write mode
@@ -258,31 +266,42 @@ def get_mempool():
     return mempool
 
 
-# Endpoint to register or update a node nickname
-@app.post("/submit_nickname")  # create POST endpoint at /node_nickname
-def submit_nickname(payload: dict):  # expects JSON payload with pubkey + nickname
-    """
-    Accepts a node's public key and a nickname.
-    Stores mapping in memory + saves to file
-    """
-    pubkey = payload.get("pubkey")  # extract public key from incoming JSON
-    nickname = payload.get("nickname")  # extract nickname from incoming JSON
+@app.post("/submit_nickname")
+def submit_nickname(payload: dict):
+    pubkey = payload.get("pubkey")
+    nickname = payload.get("nickname")
+    if not pubkey or not nickname:
+        raise HTTPException(400, "Missing pubkey or nickname")
+    
+    # We store the key EXACTLY as submitted (to not break signatures), 
+    # but our lookups will be smart enough to handle it.
+    node_nicknames[pubkey] = nickname
+    save_nicknames()
+    return {"status": "success", "pubkey": pubkey, "nickname": nickname}
 
-    # validate input
-    if not pubkey or not nickname:  # both must exist
-        raise HTTPException(400, "Missing pubkey or nickname")  # bad request
-
-    node_nicknames[pubkey] = nickname  # store in dictionary
-    save_nicknames()  # persist to file
-
-    return {"status": "success", "pubkey": pubkey, "nickname": nickname}  # confirm success
-
-@app.get("/node_nickname/{pubkey}")  # retrieves the node nickname
-def get_node_nickname(pubkey: str):  
+@app.get("/node_nickname/{pubkey}")
+def get_node_nickname(pubkey: str):
     """
-    Returns the nickname for a given node public key.
+    Finds a nickname even if the provided key is 'clean' 
+    but the stored key is 'messy' (full PEM).
     """
-    nickname = node_nicknames.get(pubkey)  # look up nickname in dictionary
-    if not nickname:  # if not found
-        return {"status": "not_found", "pubkey": pubkey}  # return placeholder
-    return {"status": "found", "pubkey": pubkey, "nickname": nickname}  # return nickname
+    target_clean = normalize_key(pubkey)
+    
+    # Iterate and compare normalized keys
+    for stored_key, nick in node_nicknames.items():
+        if normalize_key(stored_key) == target_clean:
+            return {"status": "found", "pubkey": stored_key, "nickname": nick}
+            
+    return {"status": "not_found", "pubkey": pubkey}
+
+@app.get("/resolve_nickname/{name}")
+def resolve_nickname(name: str):
+    """
+    Reverse lookup: Name -> Public Key
+    """
+    target_name = name.lower().strip()
+    for pubkey, nickname in node_nicknames.items():
+        if nickname.lower() == target_name:
+            return {"status": "found", "pubkey": pubkey, "nickname": nickname}
+            
+    return {"status": "not_found"}

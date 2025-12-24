@@ -392,6 +392,24 @@ Core Principles:
         color: black;
         font-weight: 700;
       }
+      .trends-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end; /* 👈 KEY LINE */
+        margin-bottom: 15px;
+      }
+
+      .trends-header h2 {
+        margin-bottom: 0; /* Remove default gap */
+      }
+
+      #minMaxDisplay {
+        margin-bottom: 4px; /* Fine-tune vertical drop */
+      }
+
+      .graph-tabs {
+        margin-bottom: -5px; /* Fine-tune tabs position */
+      }
     </style>
   </head>
   <body>
@@ -471,14 +489,7 @@ Core Principles:
         </section>
 
         <section>
-          <div
-            style="
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-bottom: 15px;
-            "
-          >
+          <div class="trends-header">
             <h2>Trends</h2>
             <div
               id="minMaxDisplay"
@@ -491,7 +502,7 @@ Core Principles:
                 >--</span
               >
               | Low:
-              <span id="lowVal" style="color: #add8e6; font-weight: bold"
+              <span id="lowVal" style="color: #97c2ff; font-weight: bold"
                 >--</span
               >
             </div>
@@ -499,11 +510,11 @@ Core Principles:
               <button class="tab active" onclick="setGraphMode('temp')">
                 Temp
               </button>
-              <button class="tab" onclick="setGraphMode('hum')">
-                Humidity
-              </button>
               <button class="tab" onclick="setGraphMode('pres')">
                 Pressure
+                <button class="tab" onclick="setGraphMode('hum')">
+                  Humidity
+                </button>
               </button>
             </div>
           </div>
@@ -660,6 +671,24 @@ Core Principles:
         pres: { label: "Pressure (hPa)", color: "#00ff55", gradient: false }, // Green
       };
 
+      const Y_SCALES = {
+        temp: {
+          min: 15,
+          max: 30,
+          step: 1,
+        },
+        hum: {
+          min: 0,
+          max: 100,
+          step: 20,
+        },
+        pres: {
+          min: 980,
+          max: 1040,
+          step: 10,
+        },
+      };
+
       function initChart() {
         const ctx = document.getElementById("trendChart").getContext("2d");
         const gradient = ctx.createLinearGradient(0, 0, 0, 400);
@@ -715,8 +744,6 @@ Core Principles:
                     return value.toFixed(1);
                   }, // Round Y-axis labels
                 },
-                // Adds 10% padding to the top and bottom of the scale to stop drastic-looking jumps
-                grace: "10%",
               },
             },
           },
@@ -726,6 +753,15 @@ Core Principles:
       function setGraphMode(mode) {
         currentMode = mode;
         const config = MODES[mode];
+
+        const y = myChart.options.scales.y;
+        const scale = Y_SCALES[mode];
+
+        y.min = scale.min;
+        y.max = scale.max;
+        y.ticks.stepSize = scale.step;
+
+        myChart.update();
 
         // 1. Update Buttons visual state
         document.querySelectorAll(".graph-tabs .tab").forEach((btn) => {
@@ -769,6 +805,7 @@ Core Principles:
 
       // Initialize
       initChart();
+      setGraphMode(currentMode);
 
       // ==========================================
       // DATA ENGINE (With "Gradual" Smoothing)
@@ -872,6 +909,7 @@ Core Principles:
             }
 
             myChart.data.datasets[0].data = plotData;
+            myChart.update();
 
             // Calculate Highs and Lows for the current view
             if (plotData.length > 0) {

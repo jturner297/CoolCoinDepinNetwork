@@ -39,6 +39,7 @@ Core Principles:
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cool-Coin Network Dashboard</title>
@@ -358,6 +359,39 @@ Core Principles:
       .node-card span:last-child {
         flex-shrink: 0; /* Never let the trash icon get squished */
       }
+
+      /* Graph Tabs Styling */
+      .graph-tabs {
+        background: #222;
+        padding: 4px;
+        border-radius: 8px;
+        display: flex;
+        gap: 5px;
+      }
+
+      .graph-tabs .tab {
+        background: transparent;
+        border: none;
+        color: #888;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+      }
+
+      .graph-tabs .tab:hover {
+        color: white;
+      }
+
+      /* Active State (Purple Glow) */
+      .graph-tabs .tab.active {
+        background: #e392fa; /* Brand Purple */
+        color: black;
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
@@ -437,18 +471,51 @@ Core Principles:
         </section>
 
         <section>
-          <h2>Trends</h2>
-          <div class="trends-graph-placeholder">
-            <strong
-              >Put a graph showing<br />temp history/trends<br />here</strong
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-bottom: 15px;
+            "
+          >
+            <h2>Trends</h2>
+            <div
+              id="minMaxDisplay"
+              style="font-size: 0.8rem; color: var(--text-dim)"
             >
+              High:
+              <span
+                id="highVal"
+                style="color: var(--accent-purple); font-weight: bold"
+                >--</span
+              >
+              | Low:
+              <span id="lowVal" style="color: #add8e6; font-weight: bold"
+                >--</span
+              >
+            </div>
+            <div class="graph-tabs">
+              <button class="tab active" onclick="setGraphMode('temp')">
+                Temp
+              </button>
+              <button class="tab" onclick="setGraphMode('hum')">
+                Humidity
+              </button>
+              <button class="tab" onclick="setGraphMode('pres')">
+                Pressure
+              </button>
+            </div>
           </div>
-          <div class="details-text">
-            Details<br />
-            node name:<br />
-            uptime:<br />
-            last validation time:
+
+          <div
+            class="graph-container"
+            style="position: relative; height: 300px; width: 100%"
+          >
+            <canvas id="trendChart"></canvas>
           </div>
+
+          <div class="details-text"></div>
         </section>
       </main>
     </div>
@@ -580,24 +647,143 @@ Core Principles:
       // DATA FETCHING ENGINE (The Stats Logic)
       // ==========================================
 
+      // ==========================================
+      // CHART CONFIGURATION (Clean Single-Mode)
+      // ==========================================
+      let myChart = null;
+      let currentMode = "temp"; // Default mode
+
+      // Configuration for the 3 modes
+      const MODES = {
+        temp: { label: "Temperature (°C)", color: "#e392fa", gradient: true },
+        hum: { label: "Humidity (%)", color: "#add8e6", gradient: false }, // Blue
+        pres: { label: "Pressure (hPa)", color: "#00ff55", gradient: false }, // Green
+      };
+
+      function initChart() {
+        const ctx = document.getElementById("trendChart").getContext("2d");
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, "rgba(227, 146, 250, 0.2)");
+        gradient.addColorStop(1, "rgba(227, 146, 250, 0.0)");
+
+        myChart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: MODES.temp.label,
+                data: [],
+                borderColor: MODES.temp.color,
+                backgroundColor: gradient,
+                borderWidth: 2,
+                tension: 0.3, // Reduced tension for a more "stable" line
+                pointRadius: 2, // Small dots
+                pointHoverRadius: 6, // Larger dots on hover
+                pointBackgroundColor: MODES.temp.color,
+                fill: true,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                enabled: true,
+                mode: "index",
+                intersect: false,
+                backgroundColor: "rgba(20, 20, 20, 0.9)",
+                titleColor: "#e392fa",
+                bodyColor: "#fff",
+                borderColor: "#444",
+                borderWidth: 1,
+              },
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { color: "#666", maxTicksLimit: 6 },
+              },
+              y: {
+                beginAtZero: false, // Don't force zero, but we will add padding
+                grid: { color: "rgba(255, 255, 255, 0.05)" },
+                ticks: {
+                  color: "#ccc",
+                  callback: function (value) {
+                    return value.toFixed(1);
+                  }, // Round Y-axis labels
+                },
+                // Adds 10% padding to the top and bottom of the scale to stop drastic-looking jumps
+                grace: "10%",
+              },
+            },
+          },
+        });
+      }
+      // Function to switch modes (Triggered by HTML buttons)
+      function setGraphMode(mode) {
+        currentMode = mode;
+        const config = MODES[mode];
+
+        // 1. Update Buttons visual state
+        document.querySelectorAll(".graph-tabs .tab").forEach((btn) => {
+          btn.classList.remove("active");
+          // Check based on text content since we didn't add IDs to buttons
+          if (
+            btn.textContent
+              .toLowerCase()
+              .includes(
+                mode === "pres"
+                  ? "pressure"
+                  : mode === "hum"
+                  ? "humidity"
+                  : "temp"
+              )
+          ) {
+            btn.classList.add("active");
+          }
+        });
+
+        // 2. Update Chart Color/Label/Points
+        const dataset = myChart.data.datasets[0];
+        dataset.label = config.label;
+        dataset.borderColor = config.color;
+        dataset.pointBackgroundColor = config.color; // Set dot color
+
+        if (config.gradient) {
+          dataset.fill = true;
+          const ctx = document.getElementById("trendChart").getContext("2d");
+          const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+          gradient.addColorStop(0, "rgba(227, 146, 250, 0.5)");
+          gradient.addColorStop(1, "rgba(227, 146, 250, 0.0)");
+          dataset.backgroundColor = gradient;
+        } else {
+          dataset.fill = false;
+          dataset.backgroundColor = config.color; // Set the color for the tooltip square
+        }
+
+        updateActiveNodeStats();
+      }
+
+      // Initialize
+      initChart();
+
+      // ==========================================
+      // DATA ENGINE (With "Gradual" Smoothing)
+      // ==========================================
       async function updateActiveNodeStats() {
-        // 1. Validation: Do we have a server and a selected node?
         if (!SERVER_URL) return;
         if (activeNode === null || !trackedNodes[activeNode]) {
           resetStats("--");
           return;
         }
 
-        // 2. Prepare the "Target" ID we are looking for
-        // We clean the key from the UI input so it matches the raw data format
         const targetNodeID = cleanKey(trackedNodes[activeNode]);
-        console.log(
-          "Fetching data... Looking for Node ID match:",
-          targetNodeID.substring(0, 10) + "..."
-        );
+        const MIN_TIME_GAP = 30 * 1000; // 30 Seconds (Adjust this to smooth more/less)
 
         try {
-          // 3. Fetch Chain and Mempool
           const [chainRes, mempoolRes] = await Promise.all([
             fetch(`${SERVER_URL}/chain`),
             fetch(`${SERVER_URL}/mempool`),
@@ -608,78 +794,117 @@ Core Principles:
           const chain = await chainRes.json();
           const mempool = await mempoolRes.json();
 
-          let latestTx = null;
+          // 1. Collect ALL raw history
+          let rawHistory = [];
 
-          // 4. SEARCH STRATEGY:
-          // We want the *latest* 'MINT' transaction.
-          // Check Mempool first (it's newer), then Chain (iterate backwards).
-
-          // Check Mempool
-          for (const tx of mempool) {
-            // Must be MINT type, match our ID, and have reading data
+          const processTx = (tx) => {
             if (
               tx.type === "MINT" &&
               cleanKey(tx.from_addr) === targetNodeID &&
               tx.reading
             ) {
-              latestTx = tx;
-              // Keep looping to find the absolute last one in the list
+              // Convert "MM-DD-YYYY HH:mm:ss UTC" to JS Date Object
+              // We remove " UTC" and let JS parse the standard format, then treat as UTC
+              const cleanTimeStr = tx.timestamp.replace(" UTC", "");
+              const dateObj = new Date(cleanTimeStr + "Z"); // Append Z to force UTC parsing
+
+              rawHistory.push({
+                timeObj: dateObj, // Keep object for sorting
+                timeStr: tx.timestamp, // Keep original string for display
+                temp: tx.reading.temperature,
+                pres: tx.reading.pressure,
+                hum: tx.reading.humidity,
+              });
             }
-          }
+          };
 
-          // If not in mempool, Check Chain (backwards for speed)
-          if (!latestTx) {
-            for (let i = chain.length - 1; i >= 0; i--) {
-              const block = chain[i];
-              // Loop through transactions in this block
-              for (const tx of block.transactions) {
-                if (
-                  tx.type === "MINT" &&
-                  cleanKey(tx.from_addr) === targetNodeID &&
-                  tx.reading
-                ) {
-                  latestTx = tx;
-                  break; // Found it in this block
-                }
-              }
-              if (latestTx) break; // Found it in the chain, stop looking
+          chain.forEach((block) => block.transactions.forEach(processTx));
+          mempool.forEach(processTx);
+
+          // 2. Sort Chronologically (Oldest -> Newest)
+          rawHistory.sort((a, b) => a.timeObj - b.timeObj);
+
+          // 3. Downsample (The "Gradual" Filter)
+          const smoothHistory = [];
+          let lastAddedTime = 0;
+
+          rawHistory.forEach((point) => {
+            const pointTime = point.timeObj.getTime();
+            // Only add point if it is at least MIN_TIME_GAP seconds after the last one
+            // OR if it is the very latest point (so we always see "now")
+            if (pointTime - lastAddedTime >= MIN_TIME_GAP) {
+              smoothHistory.push(point);
+              lastAddedTime = pointTime;
             }
-          }
+          });
 
-          // 5. Update the UI
-          if (latestTx) {
-            console.log("Match Found! Updating stats...", latestTx);
+          // Ensure the absolute latest data point is always included for the text stats
+          const latestReal = rawHistory[rawHistory.length - 1];
 
-            // Update Stats
+          // 4. Update Chart
+          // We take the last 20 *smoothed* points.
+          // At 30s intervals, this shows the last 10 minutes of history.
+          const chartData = smoothHistory.slice(-20);
+
+          if (latestReal) {
+            // Update Text Stats
             document.getElementById(
               "tempDisplay"
-            ).textContent = `${latestTx.reading.temperature.toFixed(2)} °C`;
+            ).textContent = `${latestReal.temp.toFixed(2)} °C`;
             document.getElementById(
               "presDisplay"
-            ).textContent = `${latestTx.reading.pressure.toFixed(2)} hPa`;
+            ).textContent = `${latestReal.pres.toFixed(2)} hPa`;
             document.getElementById(
               "humDisplay"
-            ).textContent = `${latestTx.reading.humidity.toFixed(2)} %`;
+            ).textContent = `${latestReal.hum.toFixed(2)} %`;
 
-            // (Optional) Update the "Details" placeholder with the timestamp
+            // Update Graph Labels (Time)
+            myChart.data.labels = chartData.map((h) => h.timeStr.split(" ")[1]);
+
+            // --- DYNAMIC DATA SELECTION ---
+            let plotData = [];
+            if (currentMode === "temp") {
+              plotData = chartData.map((h) => h.temp); //full precision
+            } else if (currentMode === "hum") {
+              plotData = chartData.map((h) => h.hum);
+            } else if (currentMode === "pres") {
+              plotData = chartData.map((h) => h.pres);
+            }
+
+            myChart.data.datasets[0].data = plotData;
+
+            // Calculate Highs and Lows for the current view
+            if (plotData.length > 0) {
+              const high = Math.max(...plotData);
+              const low = Math.min(...plotData);
+              const unit =
+                currentMode === "temp"
+                  ? "°C"
+                  : currentMode === "hum"
+                  ? "%"
+                  : "hPa";
+
+              document.getElementById("highVal").textContent = `${high}${unit}`;
+              document.getElementById("lowVal").textContent = `${low}${unit}`;
+            }
+
+            myChart.update();
+
+            // Update Details Box
             const detailsBox = document.querySelector(".details-text");
             if (detailsBox) {
               detailsBox.innerHTML = `
-                    Details<br>
-                    Last Contact: ${latestTx.timestamp}<br>
-                    Status: <span style="color:#00ff55">Online</span>
-                 `;
+                  Details<br>
+                  Last Sync: ${latestReal.timeStr}<br>
+                  Trend Window: ~${(chartData.length * 30) / 60} Minutes<br>
+                  Status: <span style="color:#00ff55">Online</span>
+               `;
             }
           } else {
-            console.warn("No MINT transactions found for this node.");
             resetStats("No Data");
-            const detailsBox = document.querySelector(".details-text");
-            if (detailsBox)
-              detailsBox.innerHTML = `Details<br>Status: <span style="color:red">Offline / New</span>`;
           }
         } catch (err) {
           console.error("Fetch failed:", err);
-          // Don't clear stats immediately on one failed fetch (prevents flickering)
         }
       }
 

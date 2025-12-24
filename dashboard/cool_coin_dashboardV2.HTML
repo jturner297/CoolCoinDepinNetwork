@@ -343,6 +343,21 @@ Core Principles:
       #serverSubmitBtn:hover {
         background: #555;
       }
+
+      /* 1. Target the text (the first span inside the card) */
+      .node-card span:first-child {
+        flex: 1; /* Grow to fill available space */
+        white-space: nowrap; /* Force text onto one line */
+        overflow: hidden; /* Hide anything that spills out */
+        text-overflow: ellipsis; /* Add "..." at the end */
+        min-width: 0; /* CRITICAL: Allows flex child to shrink below content size */
+        margin-right: 10px; /* Add some breathing room before the trash icon */
+      }
+
+      /* 2. Target the trash icon (the last span) */
+      .node-card span:last-child {
+        flex-shrink: 0; /* Never let the trash icon get squished */
+      }
     </style>
   </head>
   <body>
@@ -438,72 +453,81 @@ Core Principles:
       </main>
     </div>
     <script>
+      // ==========================================
+      // GLOBAL STATE
+      // ==========================================
       let SERVER_URL = null;
       let isEditing = true;
+      const MAX_NODES = 3;
+      let trackedNodes = [];
+      let activeNode = null;
 
+      // ==========================================
+      // HELPER: KEY NORMALIZATION (THE FIX)
+      // ==========================================
+      // This strips headers, footers, and all whitespace to ensure
+      // the key you paste matches the key in the database.
+      function cleanKey(key) {
+        if (!key) return "";
+        return key
+          .replace("-----BEGIN PUBLIC KEY-----", "")
+          .replace("-----END PUBLIC KEY-----", "")
+          .replace(/\s+/g, ""); // removes all spaces and newlines
+      }
+
+      // ==========================================
+      // UI LOGIC (Server & Nodes)
+      // ==========================================
       const container = document.getElementById("server-container");
       const button = document.getElementById("serverSubmitBtn");
 
+      // Handle Server IP Input
       button.addEventListener("click", () => {
         if (isEditing) {
           const address = document.getElementById("serverAddress").value.trim();
           const port = document.getElementById("serverPort").value.trim();
-
           if (!address || !port) return;
 
           SERVER_URL = `http://${address}:${port}`;
           console.log("Server set to:", SERVER_URL);
 
+          // Switch UI to "Display Mode"
           container.querySelector("#server-edit").outerHTML = `
-        <div id="server-display">
-          <span>${SERVER_URL}</span>
-        </div>
-      `;
-
+            <div id="server-display"><span>${SERVER_URL}</span></div>`;
           button.textContent = "Edit";
           isEditing = false;
+
+          // Trigger an immediate data fetch
+          updateActiveNodeStats();
         } else {
+          // Switch UI back to "Edit Mode"
           const [addr, prt] = SERVER_URL.replace("http://", "").split(":");
-
           document.getElementById("server-display").outerHTML = `
-        <div class="server-input-group" id="server-edit">
-          <input
-            type="text"
-            id="serverAddress"
-            class="server-input address"
-            value="${addr}"
-          />
-          <input
-            type="text"
-            id="serverPort"
-            class="server-input port"
-            value="${prt}"
-          />
-        </div>
-      `;
-
+            <div class="server-input-group" id="server-edit">
+              <input type="text" id="serverAddress" class="server-input address" value="${addr}" />
+              <input type="text" id="serverPort" class="server-input port" value="${prt}" />
+            </div>`;
           button.textContent = "Set";
           isEditing = true;
         }
       });
 
-      const MAX_NODES = 3;
-      let trackedNodes = [];
-      let activeNode = null;
-
+      // Handle Node List Rendering
       const nodeList = document.getElementById("node-list");
       const nodeInput = document.getElementById("nodeInput");
 
       function renderNodes() {
-        nodeList.innerHTML = ""; // clear existing nodes
-
+        nodeList.innerHTML = "";
         trackedNodes.forEach((node, idx) => {
           const card = document.createElement("div");
           card.className = "node-card";
-          if (activeNode === idx) card.style.outline = "2px solid #e392fa"; // purple outline
+          if (activeNode === idx) card.style.outline = "2px solid #e392fa";
 
           const spanName = document.createElement("span");
           spanName.textContent = node;
+          spanName.title = node; // Tooltip still useful for seeing the full key on hover
+          // Display a shortened version of the key to keep UI clean
+          //  spanName.textContent = node.substring(0, 20) + "...";
 
           const trash = document.createElement("span");
           trash.textContent = "✕";
@@ -511,152 +535,161 @@ Core Principles:
           trash.onclick = (e) => {
             e.stopPropagation();
             trackedNodes.splice(idx, 1);
-            if (activeNode === idx) activeNode = null;
+            if (activeNode === idx) {
+              activeNode = null;
+              resetStats();
+            }
             renderNodes();
           };
 
           card.appendChild(spanName);
           card.appendChild(trash);
-
           card.onclick = () => {
             activeNode = idx;
             renderNodes();
+            updateActiveNodeStats(); // Update stats immediately on click
           };
-
           nodeList.appendChild(card);
         });
 
-        // Disable input if max nodes reached
+        // Toggle input availability
         if (trackedNodes.length >= MAX_NODES) {
           nodeInput.disabled = true;
           nodeInput.placeholder = "Max nodes reached";
         } else {
           nodeInput.disabled = false;
-          nodeInput.placeholder = "Type Node ID or Nickname";
+          nodeInput.placeholder = "Paste Node Public Key";
         }
       }
 
+      // Handle Adding New Node
       nodeInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           const val = nodeInput.value.trim();
           if (val && trackedNodes.length < MAX_NODES) {
             trackedNodes.push(val);
-            activeNode = trackedNodes.length - 1;
+            activeNode = trackedNodes.length - 1; // Auto-select new node
             nodeInput.value = "";
             renderNodes();
+            updateActiveNodeStats();
           }
         }
       });
 
-      // --- DATA FETCHING ENGINE ---
+      // ==========================================
+      // DATA FETCHING ENGINE (The Stats Logic)
+      // ==========================================
 
-      // Helper: Normalize keys (remove whitespace/newlines)
-      function normalizeAddr(addr) {
-        if (!addr) return "";
-        return addr.replace(/\s+/g, "");
-      }
+      async function updateActiveNodeStats() {
+        // 1. Validation: Do we have a server and a selected node?
+        if (!SERVER_URL) return;
+        if (activeNode === null || !trackedNodes[activeNode]) {
+          resetStats("--");
+          return;
+        }
 
-      // Fetch Chain and Mempool from the Python Server
-      async function fetchData() {
-        if (!SERVER_URL) return null; // Don't fetch if server isn't set
+        // 2. Prepare the "Target" ID we are looking for
+        // We clean the key from the UI input so it matches the raw data format
+        const targetNodeID = cleanKey(trackedNodes[activeNode]);
+        console.log(
+          "Fetching data... Looking for Node ID match:",
+          targetNodeID.substring(0, 10) + "..."
+        );
 
         try {
+          // 3. Fetch Chain and Mempool
           const [chainRes, mempoolRes] = await Promise.all([
             fetch(`${SERVER_URL}/chain`),
             fetch(`${SERVER_URL}/mempool`),
           ]);
+
+          if (!chainRes.ok || !mempoolRes.ok) throw new Error("Server Error");
+
           const chain = await chainRes.json();
           const mempool = await mempoolRes.json();
-          return { chain, mempool };
-        } catch (err) {
-          console.error("Connection failed:", err);
-          return null;
-        }
-      }
 
-      // Update the UI based on the currently Active Node
-      async function updateActiveNodeStats() {
-        // 1. Check if we have an active node selected
-        if (activeNode === null || activeNode >= trackedNodes.length) {
-          resetStats(); // Clear display if no node selected
-          return;
-        }
+          let latestTx = null;
 
-        const currentNodeID = normalizeAddr(trackedNodes[activeNode]);
-        // NOTE: Currently assumes user typed a Public Key.
-        // If they typed a Nickname, we need a mapping mechanism (see note below).
+          // 4. SEARCH STRATEGY:
+          // We want the *latest* 'MINT' transaction.
+          // Check Mempool first (it's newer), then Chain (iterate backwards).
 
-        // 2. Fetch Data
-        const data = await fetchData();
-        if (!data) return;
-
-        let latestTx = null;
-
-        // 3. Search Mempool first (freshest data)
-        // We look for transactions where 'from_addr' matches our node
-        for (const tx of data.mempool) {
-          if (
-            tx.type === "MINT" &&
-            normalizeAddr(tx.from_addr) === currentNodeID
-          ) {
-            latestTx = tx;
-            // In mempool, the last item is usually the newest, but we keep looping to be sure
-          }
-        }
-
-        // 4. If nothing in mempool, check the Blockchain (latest blocks first)
-        if (!latestTx) {
-          for (let i = data.chain.length - 1; i >= 0; i--) {
-            const block = data.chain[i];
-            for (const tx of block.transactions) {
-              if (
-                tx.type === "MINT" &&
-                normalizeAddr(tx.from_addr) === currentNodeID
-              ) {
-                latestTx = tx;
-                break; // Found the newest confirmed tx
-              }
+          // Check Mempool
+          for (const tx of mempool) {
+            // Must be MINT type, match our ID, and have reading data
+            if (
+              tx.type === "MINT" &&
+              cleanKey(tx.from_addr) === targetNodeID &&
+              tx.reading
+            ) {
+              latestTx = tx;
+              // Keep looping to find the absolute last one in the list
             }
-            if (latestTx) break;
           }
-        }
 
-        // 5. Update DOM
-        if (latestTx && latestTx.reading) {
-          document.getElementById(
-            "tempDisplay"
-          ).textContent = `${latestTx.reading.temperature.toFixed(2)} °C`;
-          document.getElementById(
-            "presDisplay"
-          ).textContent = `${latestTx.reading.pressure.toFixed(2)} hPa`;
-          document.getElementById(
-            "humDisplay"
-          ).textContent = `${latestTx.reading.humidity.toFixed(2)} %`;
+          // If not in mempool, Check Chain (backwards for speed)
+          if (!latestTx) {
+            for (let i = chain.length - 1; i >= 0; i--) {
+              const block = chain[i];
+              // Loop through transactions in this block
+              for (const tx of block.transactions) {
+                if (
+                  tx.type === "MINT" &&
+                  cleanKey(tx.from_addr) === targetNodeID &&
+                  tx.reading
+                ) {
+                  latestTx = tx;
+                  break; // Found it in this block
+                }
+              }
+              if (latestTx) break; // Found it in the chain, stop looking
+            }
+          }
 
-          // Update Details text (Example implementation)
-          // You can also update the timestamp here if you add an ID to the details section
-          console.log(
-            `Updated stats for node ${currentNodeID} from timestamp: ${latestTx.timestamp}`
-          );
-        } else {
-          // Node exists in list, but no data found on chain yet
-          resetStats("No Data");
+          // 5. Update the UI
+          if (latestTx) {
+            console.log("Match Found! Updating stats...", latestTx);
+
+            // Update Stats
+            document.getElementById(
+              "tempDisplay"
+            ).textContent = `${latestTx.reading.temperature.toFixed(2)} °C`;
+            document.getElementById(
+              "presDisplay"
+            ).textContent = `${latestTx.reading.pressure.toFixed(2)} hPa`;
+            document.getElementById(
+              "humDisplay"
+            ).textContent = `${latestTx.reading.humidity.toFixed(2)} %`;
+
+            // (Optional) Update the "Details" placeholder with the timestamp
+            const detailsBox = document.querySelector(".details-text");
+            if (detailsBox) {
+              detailsBox.innerHTML = `
+                    Details<br>
+                    Last Contact: ${latestTx.timestamp}<br>
+                    Status: <span style="color:#00ff55">Online</span>
+                 `;
+            }
+          } else {
+            console.warn("No MINT transactions found for this node.");
+            resetStats("No Data");
+            const detailsBox = document.querySelector(".details-text");
+            if (detailsBox)
+              detailsBox.innerHTML = `Details<br>Status: <span style="color:red">Offline / New</span>`;
+          }
+        } catch (err) {
+          console.error("Fetch failed:", err);
+          // Don't clear stats immediately on one failed fetch (prevents flickering)
         }
       }
 
-      function resetStats(msg = "--") {
-        document.getElementById("tempDisplay").textContent = `${msg} °C`;
-        document.getElementById("presDisplay").textContent = `${msg} hPa`;
-        document.getElementById("humDisplay").textContent = `${msg} %`;
+      function resetStats(msg) {
+        document.getElementById("tempDisplay").textContent = `${msg}`;
+        document.getElementById("presDisplay").textContent = `${msg}`;
+        document.getElementById("humDisplay").textContent = `${msg}`;
       }
 
-      // --- INITIALIZATION ---
-
-      // Set a default server if one isn't entered (Optional, for easier debugging)
-      // SERVER_URL = "http://localhost:8000";
-      // updateActiveNodeStats();
-
-      // Poll for updates every 2 seconds
+      // Auto-refresh every 2 seconds
       setInterval(updateActiveNodeStats, 2000);
     </script>
   </body>

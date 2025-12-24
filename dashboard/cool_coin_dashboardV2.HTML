@@ -418,6 +418,10 @@ Core Principles:
         <h1>Cool-Coin Network</h1>
         <p>Dashboard</p>
         <div id="server-container">
+          <div id="server-display" style="display: none">
+            <span id="serverUrlSpan"></span>
+          </div>
+
           <div class="server-input-group" id="server-edit">
             <input
               type="text"
@@ -432,6 +436,7 @@ Core Principles:
               placeholder="port"
             />
           </div>
+
           <button id="serverSubmitBtn">Set</button>
         </div>
       </div>
@@ -540,28 +545,78 @@ Core Principles:
       let trackedNodes = [];
       let activeNode = null;
 
+      // Cache the latest smoothed data so we can switch tabs without re-fetching
+      let cachedChartData = [];
+      let lastFetchSuccessful = false;
+
+      // Chart Global
+      let myChart = null;
+      let currentMode = "temp";
+
+      const MODES = {
+        temp: {
+          label: "Temperature (°C)",
+          color: "#e392fa",
+          gradient: true,
+          unit: "°C",
+        },
+        hum: {
+          label: "Humidity (%)",
+          color: "#add8e6",
+          gradient: false,
+          unit: "%",
+        },
+        pres: {
+          label: "Pressure (hPa)",
+          color: "#00ff55",
+          gradient: false,
+          unit: "hPa",
+        },
+      };
+
+      const Y_SCALES = {
+        temp: { min: 15, max: 30, step: 1 },
+        hum: { min: 0, max: 100, step: 20 },
+        pres: { min: 980, max: 1040, step: 10 },
+      };
+
       // ==========================================
-      // HELPER: KEY NORMALIZATION (THE FIX)
+      // HELPER UTILITIES
       // ==========================================
-      // This strips headers, footers, and all whitespace to ensure
-      // the key you paste matches the key in the database.
       function cleanKey(key) {
         if (!key) return "";
         return key
           .replace("-----BEGIN PUBLIC KEY-----", "")
           .replace("-----END PUBLIC KEY-----", "")
-          .replace(/\s+/g, ""); // removes all spaces and newlines
+          .replace(/\s+/g, "");
+      }
+
+      // Helper to generate gradient to avoid code repetition
+      function createGradient(ctx, color) {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        // Convert hex to rgba for the fade effect
+        // Note: Simple hack for the specific colors you use.
+        // Ideally use a hex-to-rgb converter, but hardcoding for optimization here is fine.
+        let baseColor = "rgba(227, 146, 250,"; // Default Purple
+        if (color === "#add8e6") baseColor = "rgba(173, 216, 230,"; // Blue
+        if (color === "#00ff55") baseColor = "rgba(0, 255, 85,"; // Green
+
+        gradient.addColorStop(0, `${baseColor} 0.5)`);
+        gradient.addColorStop(1, `${baseColor} 0.0)`);
+        return gradient;
       }
 
       // ==========================================
-      // UI LOGIC (Server & Nodes)
+      // UI: SERVER CONFIGURATION
       // ==========================================
-      const container = document.getElementById("server-container");
-      const button = document.getElementById("serverSubmitBtn");
+      const serverEditDiv = document.getElementById("server-edit");
+      const serverDisplayDiv = document.getElementById("server-display");
+      const serverUrlSpan = document.getElementById("serverUrlSpan");
+      const serverBtn = document.getElementById("serverSubmitBtn");
 
-      // Handle Server IP Input
-      button.addEventListener("click", () => {
+      serverBtn.addEventListener("click", () => {
         if (isEditing) {
+          // SAVE ACTION
           const address = document.getElementById("serverAddress").value.trim();
           const port = document.getElementById("serverPort").value.trim();
           if (!address || !port) return;
@@ -569,28 +624,32 @@ Core Principles:
           SERVER_URL = `http://${address}:${port}`;
           console.log("Server set to:", SERVER_URL);
 
-          // Switch UI to "Display Mode"
-          container.querySelector("#server-edit").outerHTML = `
-            <div id="server-display"><span>${SERVER_URL}</span></div>`;
-          button.textContent = "Edit";
+          // Toggle UI
+          serverUrlSpan.textContent = SERVER_URL;
+          serverEditDiv.style.display = "none";
+          serverDisplayDiv.style.display = "flex";
+          serverBtn.textContent = "Edit";
           isEditing = false;
 
-          // Trigger an immediate data fetch
+          // Immediate fetch
           updateActiveNodeStats();
         } else {
-          // Switch UI back to "Edit Mode"
+          // EDIT ACTION
           const [addr, prt] = SERVER_URL.replace("http://", "").split(":");
-          document.getElementById("server-display").outerHTML = `
-            <div class="server-input-group" id="server-edit">
-              <input type="text" id="serverAddress" class="server-input address" value="${addr}" />
-              <input type="text" id="serverPort" class="server-input port" value="${prt}" />
-            </div>`;
-          button.textContent = "Set";
+          document.getElementById("serverAddress").value = addr || "";
+          document.getElementById("serverPort").value = prt || "";
+
+          // Toggle UI
+          serverDisplayDiv.style.display = "none";
+          serverEditDiv.style.display = "flex";
+          serverBtn.textContent = "Set";
           isEditing = true;
         }
       });
 
-      // Handle Node List Rendering
+      // ==========================================
+      // UI: NODE MANAGEMENT
+      // ==========================================
       const nodeList = document.getElementById("node-list");
       const nodeInput = document.getElementById("nodeInput");
 
@@ -603,9 +662,6 @@ Core Principles:
 
           const spanName = document.createElement("span");
           spanName.textContent = node;
-          spanName.title = node; // Tooltip still useful for seeing the full key on hover
-          // Display a shortened version of the key to keep UI clean
-          //  spanName.textContent = node.substring(0, 20) + "...";
 
           const trash = document.createElement("span");
           trash.textContent = "✕";
@@ -615,38 +671,42 @@ Core Principles:
             trackedNodes.splice(idx, 1);
             if (activeNode === idx) {
               activeNode = null;
-              resetStats();
+              resetStats("--");
+            } else if (activeNode > idx) {
+              activeNode--; // Shift active index if we deleted a node above it
             }
             renderNodes();
           };
 
           card.appendChild(spanName);
           card.appendChild(trash);
+
           card.onclick = () => {
             activeNode = idx;
             renderNodes();
-            updateActiveNodeStats(); // Update stats immediately on click
+            updateActiveNodeStats();
           };
+
           nodeList.appendChild(card);
         });
 
-        // Toggle input availability
+        // Handle Input State
         if (trackedNodes.length >= MAX_NODES) {
           nodeInput.disabled = true;
           nodeInput.placeholder = "Max nodes reached";
         } else {
           nodeInput.disabled = false;
           nodeInput.placeholder = "Paste Node Public Key";
+          nodeInput.focus();
         }
       }
 
-      // Handle Adding New Node
       nodeInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           const val = nodeInput.value.trim();
           if (val && trackedNodes.length < MAX_NODES) {
             trackedNodes.push(val);
-            activeNode = trackedNodes.length - 1; // Auto-select new node
+            activeNode = trackedNodes.length - 1;
             nodeInput.value = "";
             renderNodes();
             updateActiveNodeStats();
@@ -655,45 +715,11 @@ Core Principles:
       });
 
       // ==========================================
-      // DATA FETCHING ENGINE (The Stats Logic)
+      // CHART ENGINE
       // ==========================================
-
-      // ==========================================
-      // CHART CONFIGURATION (Clean Single-Mode)
-      // ==========================================
-      let myChart = null;
-      let currentMode = "temp"; // Default mode
-
-      // Configuration for the 3 modes
-      const MODES = {
-        temp: { label: "Temperature (°C)", color: "#e392fa", gradient: true },
-        hum: { label: "Humidity (%)", color: "#add8e6", gradient: false }, // Blue
-        pres: { label: "Pressure (hPa)", color: "#00ff55", gradient: false }, // Green
-      };
-
-      const Y_SCALES = {
-        temp: {
-          min: 15,
-          max: 30,
-          step: 1,
-        },
-        hum: {
-          min: 0,
-          max: 100,
-          step: 20,
-        },
-        pres: {
-          min: 980,
-          max: 1040,
-          step: 10,
-        },
-      };
-
       function initChart() {
         const ctx = document.getElementById("trendChart").getContext("2d");
-        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-        gradient.addColorStop(0, "rgba(227, 146, 250, 0.2)");
-        gradient.addColorStop(1, "rgba(227, 146, 250, 0.0)");
+        const config = MODES[currentMode];
 
         myChart = new Chart(ctx, {
           type: "line",
@@ -701,72 +727,52 @@ Core Principles:
             labels: [],
             datasets: [
               {
-                label: MODES.temp.label,
+                label: config.label,
                 data: [],
-                borderColor: MODES.temp.color,
-                backgroundColor: gradient,
+                borderColor: config.color,
+                backgroundColor: config.gradient
+                  ? createGradient(ctx, config.color)
+                  : config.color,
                 borderWidth: 2,
-                tension: 0.3, // Reduced tension for a more "stable" line
-                pointRadius: 2, // Small dots
-                pointHoverRadius: 6, // Larger dots on hover
-                pointBackgroundColor: MODES.temp.color,
-                fill: true,
+                tension: 0.3,
+                pointRadius: 2,
+                pointHoverRadius: 6,
+                pointBackgroundColor: config.color,
+                fill: config.gradient,
               },
             ],
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                enabled: true,
-                mode: "index",
-                intersect: false,
-                backgroundColor: "rgba(20, 20, 20, 0.9)",
-                titleColor: "#e392fa",
-                bodyColor: "#fff",
-                borderColor: "#444",
-                borderWidth: 1,
-              },
-            },
+            plugins: { legend: { display: false } },
             scales: {
               x: {
                 grid: { display: false },
                 ticks: { color: "#666", maxTicksLimit: 6 },
               },
               y: {
-                beginAtZero: false, // Don't force zero, but we will add padding
                 grid: { color: "rgba(255, 255, 255, 0.05)" },
-                ticks: {
-                  color: "#ccc",
-                  callback: function (value) {
-                    return value.toFixed(1);
-                  }, // Round Y-axis labels
-                },
+                ticks: { color: "#ccc" },
               },
             },
           },
         });
       }
-      // Function to switch modes (Triggered by HTML buttons)
+
+      // Switch Mode (Temp / Hum / Pres)
+      // OPTIMIZED: Does NOT fetch data. Only re-renders from cache.
       function setGraphMode(mode) {
+        if (currentMode === mode) return; // No op if clicking same tab
         currentMode = mode;
+
         const config = MODES[mode];
+        const dataset = myChart.data.datasets[0];
+        const yScale = myChart.options.scales.y;
 
-        const y = myChart.options.scales.y;
-        const scale = Y_SCALES[mode];
-
-        y.min = scale.min;
-        y.max = scale.max;
-        y.ticks.stepSize = scale.step;
-
-        myChart.update();
-
-        // 1. Update Buttons visual state
+        // 1. Update Buttons
         document.querySelectorAll(".graph-tabs .tab").forEach((btn) => {
           btn.classList.remove("active");
-          // Check based on text content since we didn't add IDs to buttons
           if (
             btn.textContent
               .toLowerCase()
@@ -782,33 +788,67 @@ Core Principles:
           }
         });
 
-        // 2. Update Chart Color/Label/Points
-        const dataset = myChart.data.datasets[0];
+        // 2. Update Visuals
         dataset.label = config.label;
         dataset.borderColor = config.color;
-        dataset.pointBackgroundColor = config.color; // Set dot color
+        dataset.pointBackgroundColor = config.color;
 
         if (config.gradient) {
           dataset.fill = true;
-          const ctx = document.getElementById("trendChart").getContext("2d");
-          const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-          gradient.addColorStop(0, "rgba(227, 146, 250, 0.5)");
-          gradient.addColorStop(1, "rgba(227, 146, 250, 0.0)");
-          dataset.backgroundColor = gradient;
+          dataset.backgroundColor = createGradient(
+            document.getElementById("trendChart").getContext("2d"),
+            config.color
+          );
         } else {
           dataset.fill = false;
-          dataset.backgroundColor = config.color; // Set the color for the tooltip square
+          dataset.backgroundColor = config.color;
         }
 
-        updateActiveNodeStats();
+        // 3. Update Scale
+        if (mode === "pres") {
+          delete yScale.min;
+          delete yScale.max;
+          delete yScale.stepSize;
+        } else {
+          yScale.min = Y_SCALES[mode].min;
+          yScale.max = Y_SCALES[mode].max;
+          yScale.ticks.stepSize = Y_SCALES[mode].step;
+        }
+
+        // 4. Re-draw data from cache without fetching
+        renderChartFromCache();
       }
 
-      // Initialize
-      initChart();
-      setGraphMode(currentMode);
+      // Renders the chart using the data currently stored in `cachedChartData`
+      function renderChartFromCache() {
+        if (!myChart || cachedChartData.length === 0) return;
+
+        // Extract correct property based on mode
+        const plotData = cachedChartData.map((h) => h[currentMode]); // h.temp, h.pres, or h.hum
+        const labels = cachedChartData.map((h) => h.timeStr.split(" ")[1]);
+
+        myChart.data.labels = labels;
+        myChart.data.datasets[0].data = plotData;
+
+        // Update Min/Max Text
+        if (plotData.length > 0) {
+          const high = Math.max(...plotData);
+          const low = Math.min(...plotData);
+          const unit = MODES[currentMode].unit;
+
+          document.getElementById("highVal").textContent = `${high.toFixed(
+            1
+          )}${unit}`;
+          document.getElementById("lowVal").textContent = `${low.toFixed(
+            1
+          )}${unit}`;
+        }
+
+        myChart.update();
+      }
 
       // ==========================================
-      // DATA ENGINE (With "Gradual" Smoothing)
+      // DATA FETCHING (Logic Layer)
       // ==========================================
       async function updateActiveNodeStats() {
         if (!SERVER_URL) return;
@@ -818,7 +858,7 @@ Core Principles:
         }
 
         const targetNodeID = cleanKey(trackedNodes[activeNode]);
-        const MIN_TIME_GAP = 30 * 1000; // 30 Seconds (Adjust this to smooth more/less)
+        const MIN_TIME_GAP = 30 * 1000;
 
         try {
           const [chainRes, mempoolRes] = await Promise.all([
@@ -831,23 +871,19 @@ Core Principles:
           const chain = await chainRes.json();
           const mempool = await mempoolRes.json();
 
-          // 1. Collect ALL raw history
           let rawHistory = [];
 
+          // Helper to parse tx
           const processTx = (tx) => {
             if (
               tx.type === "MINT" &&
               cleanKey(tx.from_addr) === targetNodeID &&
               tx.reading
             ) {
-              // Convert "MM-DD-YYYY HH:mm:ss UTC" to JS Date Object
-              // We remove " UTC" and let JS parse the standard format, then treat as UTC
               const cleanTimeStr = tx.timestamp.replace(" UTC", "");
-              const dateObj = new Date(cleanTimeStr + "Z"); // Append Z to force UTC parsing
-
               rawHistory.push({
-                timeObj: dateObj, // Keep object for sorting
-                timeStr: tx.timestamp, // Keep original string for display
+                timeObj: new Date(cleanTimeStr + "Z"),
+                timeStr: tx.timestamp,
                 temp: tx.reading.temperature,
                 pres: tx.reading.pressure,
                 hum: tx.reading.humidity,
@@ -858,33 +894,28 @@ Core Principles:
           chain.forEach((block) => block.transactions.forEach(processTx));
           mempool.forEach(processTx);
 
-          // 2. Sort Chronologically (Oldest -> Newest)
+          // Sort
           rawHistory.sort((a, b) => a.timeObj - b.timeObj);
 
-          // 3. Downsample (The "Gradual" Filter)
+          // Smooth (Downsample)
           const smoothHistory = [];
           let lastAddedTime = 0;
 
           rawHistory.forEach((point) => {
             const pointTime = point.timeObj.getTime();
-            // Only add point if it is at least MIN_TIME_GAP seconds after the last one
-            // OR if it is the very latest point (so we always see "now")
             if (pointTime - lastAddedTime >= MIN_TIME_GAP) {
               smoothHistory.push(point);
               lastAddedTime = pointTime;
             }
           });
 
-          // Ensure the absolute latest data point is always included for the text stats
+          // UPDATE GLOBAL CACHE (Last 20 points)
+          cachedChartData = smoothHistory.slice(-20);
+
+          // Update Live Text Stats (use absolute latest real reading, not smoothed)
           const latestReal = rawHistory[rawHistory.length - 1];
 
-          // 4. Update Chart
-          // We take the last 20 *smoothed* points.
-          // At 30s intervals, this shows the last 10 minutes of history.
-          const chartData = smoothHistory.slice(-20);
-
           if (latestReal) {
-            // Update Text Stats
             document.getElementById(
               "tempDisplay"
             ).textContent = `${latestReal.temp.toFixed(2)} °C`;
@@ -895,64 +926,53 @@ Core Principles:
               "humDisplay"
             ).textContent = `${latestReal.hum.toFixed(2)} %`;
 
-            // Update Graph Labels (Time)
-            myChart.data.labels = chartData.map((h) => h.timeStr.split(" ")[1]);
-
-            // --- DYNAMIC DATA SELECTION ---
-            let plotData = [];
-            if (currentMode === "temp") {
-              plotData = chartData.map((h) => h.temp); //full precision
-            } else if (currentMode === "hum") {
-              plotData = chartData.map((h) => h.hum);
-            } else if (currentMode === "pres") {
-              plotData = chartData.map((h) => h.pres);
-            }
-
-            myChart.data.datasets[0].data = plotData;
-            myChart.update();
-
-            // Calculate Highs and Lows for the current view
-            if (plotData.length > 0) {
-              const high = Math.max(...plotData);
-              const low = Math.min(...plotData);
-              const unit =
-                currentMode === "temp"
-                  ? "°C"
-                  : currentMode === "hum"
-                  ? "%"
-                  : "hPa";
-
-              document.getElementById("highVal").textContent = `${high}${unit}`;
-              document.getElementById("lowVal").textContent = `${low}${unit}`;
-            }
-
-            myChart.update();
-
-            // Update Details Box
+            // Update Details Footer
             const detailsBox = document.querySelector(".details-text");
             if (detailsBox) {
               detailsBox.innerHTML = `
-                  Details<br>
-                  Last Sync: ${latestReal.timeStr}<br>
-                  Trend Window: ~${(chartData.length * 30) / 60} Minutes<br>
-                  Status: <span style="color:#00ff55">Online</span>
-               `;
+                Details<br>
+                Last Sync: ${latestReal.timeStr}<br>
+                Trend Window: ~${(cachedChartData.length * 30) / 60} Minutes<br>
+                Status: <span style="color:#00ff55">Online</span>
+            `;
             }
+
+            // Render the graph with the new data
+            renderChartFromCache();
+            lastFetchSuccessful = true;
           } else {
             resetStats("No Data");
           }
         } catch (err) {
           console.error("Fetch failed:", err);
+          // Optional: Visual cue for offline
+          if (lastFetchSuccessful) {
+            // Only reset if we previously had data, otherwise keep "No Data"
+            resetStats("Offline");
+          }
+          lastFetchSuccessful = false;
         }
       }
 
       function resetStats(msg) {
-        document.getElementById("tempDisplay").textContent = `${msg}`;
-        document.getElementById("presDisplay").textContent = `${msg}`;
-        document.getElementById("humDisplay").textContent = `${msg}`;
+        document.getElementById("tempDisplay").textContent = msg;
+        document.getElementById("presDisplay").textContent = msg;
+        document.getElementById("humDisplay").textContent = msg;
+        document.getElementById("highVal").textContent = "--";
+        document.getElementById("lowVal").textContent = "--";
+        // Clear chart
+        cachedChartData = [];
+        if (myChart) {
+          myChart.data.labels = [];
+          myChart.data.datasets[0].data = [];
+          myChart.update();
+        }
       }
 
-      // Auto-refresh every 2 seconds
+      // Initialize
+      initChart();
+      setGraphMode(currentMode);
+      // Start loop
       setInterval(updateActiveNodeStats, 2000);
     </script>
   </body>

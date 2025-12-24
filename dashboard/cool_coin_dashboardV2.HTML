@@ -1,3 +1,41 @@
+<!--
+===========================================================
+COOL-COIN DASHBOARD V2 (Work in Progress) — Overview
+Author: Justin Turner
+
+Purpose:
+This dashboard is designed primarily to **track nodes** in the Cool-Coin network, 
+with wallet tracking as a secondary feature. It provides a real-time, interactive 
+interface for monitoring network health, node status, and associated wallet activity.
+
+Core Principles:
+
+1. Node-Centric Design:
+   - Nodes are the primary unit of monitoring; users can add up to MAX_NODES nodes.
+   - Each node has a dynamic status card reflecting online/offline state, uptime, 
+     last validation time, and other metrics.
+   - Active node selection highlights the currently monitored node, which drives 
+     secondary wallet and stats updates.
+
+2. Wallet Integration (Secondary):
+   - Wallets are tied to the currently active node for context-specific data.
+   - Users can input a wallet address to track confirmed and pending balances, 
+     latest transactions, and associated readings (temperature, pressure, humidity).
+   - Wallet tracking is intentionally secondary, ensuring node monitoring remains central.
+
+3. Real-Time Updates:
+   - Node statuses and wallet data are automatically refreshed at regular intervals.
+   - Fetches use the current SERVER_URL to connect dynamically to the Cool-Coin server.
+   - Error handling ensures the dashboard remains stable even if the server is unreachable.
+
+4. User Interaction & Constraints:
+   - Nodes are added via an input box with a maximum limit to prevent UI overload.
+   - Nodes and wallet data are displayed clearly with visual cues (colors, outlines) 
+     for online/offline or active state.
+   - Users can remove nodes easily with a trash icon, promoting flexible management.
+===========================================================
+-->
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -108,29 +146,47 @@
         width: 250px;
         background-color: var(--sidebar-bg);
         padding: 30px 20px;
+
+        display: flex;
+        flex-direction: column;
       }
 
       aside h3 {
         color: var(--accent-purple);
-        margin-top: -21px;
-        margin-bottom: -6px;
-        font-weight: 800;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+
+        margin-top: -13px;
+        margin-bottom: 6px; /* tweak this value */
       }
 
+      #node-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
       .node-card {
         background: var(--node-card-bg);
         padding: 15px;
         border-radius: 12px;
-        display: block; /* stack naturally */
-        margin-top: 10px; /* spacing between cards */
+
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
       }
       .node-card:not(.node-input-card) {
         cursor: pointer;
+        height: 35px; /* sets a fixed “fat” height */
+        padding: 20px;
       }
 
       /* Force the input to always be text cursor */
       .node-input-card .node-input {
         cursor: text;
+      }
+      .node-input-card {
+        margin-bottom: 15px;
       }
 
       .node-input-card .node-input {
@@ -344,15 +400,15 @@
           <h2>Live Environmental Statistics</h2>
           <div class="stat-card">
             <span class="stat-label">Temperature</span>
-            <span class="stat-value">22.6 °C</span>
+            <span class="stat-value" id="tempDisplay">-- °C</span>
           </div>
           <div class="stat-card">
             <span class="stat-label">Pressure</span>
-            <span class="stat-value">1013 hpa</span>
+            <span class="stat-value" id="presDisplay">-- hpa</span>
           </div>
           <div class="stat-card">
             <span class="stat-label">Humidity</span>
-            <span class="stat-value">41%</span>
+            <span class="stat-value" id="humDisplay">-- %</span>
           </div>
 
           <h2>Check Wallet Balance</h2>
@@ -452,7 +508,6 @@
           const trash = document.createElement("span");
           trash.textContent = "✕";
           trash.style.cursor = "pointer";
-          trash.style.marginLeft = "10px";
           trash.onclick = (e) => {
             e.stopPropagation();
             trackedNodes.splice(idx, 1);
@@ -492,6 +547,117 @@
           }
         }
       });
+
+      // --- DATA FETCHING ENGINE ---
+
+      // Helper: Normalize keys (remove whitespace/newlines)
+      function normalizeAddr(addr) {
+        if (!addr) return "";
+        return addr.replace(/\s+/g, "");
+      }
+
+      // Fetch Chain and Mempool from the Python Server
+      async function fetchData() {
+        if (!SERVER_URL) return null; // Don't fetch if server isn't set
+
+        try {
+          const [chainRes, mempoolRes] = await Promise.all([
+            fetch(`${SERVER_URL}/chain`),
+            fetch(`${SERVER_URL}/mempool`),
+          ]);
+          const chain = await chainRes.json();
+          const mempool = await mempoolRes.json();
+          return { chain, mempool };
+        } catch (err) {
+          console.error("Connection failed:", err);
+          return null;
+        }
+      }
+
+      // Update the UI based on the currently Active Node
+      async function updateActiveNodeStats() {
+        // 1. Check if we have an active node selected
+        if (activeNode === null || activeNode >= trackedNodes.length) {
+          resetStats(); // Clear display if no node selected
+          return;
+        }
+
+        const currentNodeID = normalizeAddr(trackedNodes[activeNode]);
+        // NOTE: Currently assumes user typed a Public Key.
+        // If they typed a Nickname, we need a mapping mechanism (see note below).
+
+        // 2. Fetch Data
+        const data = await fetchData();
+        if (!data) return;
+
+        let latestTx = null;
+
+        // 3. Search Mempool first (freshest data)
+        // We look for transactions where 'from_addr' matches our node
+        for (const tx of data.mempool) {
+          if (
+            tx.type === "MINT" &&
+            normalizeAddr(tx.from_addr) === currentNodeID
+          ) {
+            latestTx = tx;
+            // In mempool, the last item is usually the newest, but we keep looping to be sure
+          }
+        }
+
+        // 4. If nothing in mempool, check the Blockchain (latest blocks first)
+        if (!latestTx) {
+          for (let i = data.chain.length - 1; i >= 0; i--) {
+            const block = data.chain[i];
+            for (const tx of block.transactions) {
+              if (
+                tx.type === "MINT" &&
+                normalizeAddr(tx.from_addr) === currentNodeID
+              ) {
+                latestTx = tx;
+                break; // Found the newest confirmed tx
+              }
+            }
+            if (latestTx) break;
+          }
+        }
+
+        // 5. Update DOM
+        if (latestTx && latestTx.reading) {
+          document.getElementById(
+            "tempDisplay"
+          ).textContent = `${latestTx.reading.temperature.toFixed(2)} °C`;
+          document.getElementById(
+            "presDisplay"
+          ).textContent = `${latestTx.reading.pressure.toFixed(2)} hPa`;
+          document.getElementById(
+            "humDisplay"
+          ).textContent = `${latestTx.reading.humidity.toFixed(2)} %`;
+
+          // Update Details text (Example implementation)
+          // You can also update the timestamp here if you add an ID to the details section
+          console.log(
+            `Updated stats for node ${currentNodeID} from timestamp: ${latestTx.timestamp}`
+          );
+        } else {
+          // Node exists in list, but no data found on chain yet
+          resetStats("No Data");
+        }
+      }
+
+      function resetStats(msg = "--") {
+        document.getElementById("tempDisplay").textContent = `${msg} °C`;
+        document.getElementById("presDisplay").textContent = `${msg} hPa`;
+        document.getElementById("humDisplay").textContent = `${msg} %`;
+      }
+
+      // --- INITIALIZATION ---
+
+      // Set a default server if one isn't entered (Optional, for easier debugging)
+      // SERVER_URL = "http://localhost:8000";
+      // updateActiveNodeStats();
+
+      // Poll for updates every 2 seconds
+      setInterval(updateActiveNodeStats, 2000);
     </script>
   </body>
 </html>

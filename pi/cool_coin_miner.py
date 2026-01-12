@@ -159,7 +159,12 @@ def register_node_nickname(server_ip, server_port, node_pubkey_pem, node_nicknam
     
     # Build URL for nickname endpoint
     url = f"http://{server_ip}:{server_port}/submit_nickname"
-    
+        
+    clean_key = node_pubkey_pem.replace("-----BEGIN PUBLIC KEY-----", "") \
+                               .replace("-----END PUBLIC KEY-----", "") \
+                               .replace("\n", "") \
+                               .replace("\r", "") \
+                               .replace(" ", "")
     # Build the JSON payload
     payload = {
         "pubkey": node_pubkey_pem, # node ID (pi public key)

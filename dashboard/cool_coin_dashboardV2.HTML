@@ -32,7 +32,7 @@ Core Principles:
    - Nodes are added via an input box with a maximum limit to prevent UI overload.
    - Nodes and wallet data are displayed clearly with visual cues (colors, outlines) 
      for online/offline or active state.
-   - Users can remove nodes easily with a trash icon, promoting flexible management.
+   - Users can easily remove tracked nodes with the cross icon
 ===========================================================
 -->
 
@@ -923,10 +923,29 @@ Core Principles:
           windowHtml = `<span class="detail-val-white">${windowTxt}</span>`;
         }
 
+        // --- NEW LOGIC START ---
+        const fullCleanID = cleanKey(id);
+
+        // Grab first 8 chars ... and last 8 chars
+        const shortID =
+          fullCleanID.length > 20
+            ? fullCleanID.substring(0, 12) +
+              "................" +
+              fullCleanID.substring(fullCleanID.length - 12)
+            : fullCleanID;
+        // --- NEW LOGIC END ---
+
+        // UPDATED HTML below:
+        // 1. Removed style="word-break: break-all" (prevent wrapping)
+        // 2. Added title="${fullCleanID}" (hover to see full key)
+        // 3. Displaying ${shortID} instead of the full key
         container.innerHTML = `
           <h3 class="details-header">Details</h3>
           <div class="detail-row"><span class="detail-label">Node name:</span>${nameHtml}</div>
-          <div class="detail-row"><span class="detail-label">Node ID:</span><span class="detail-val-white" style="word-break: break-all;">${id}</span></div>
+          <div class="detail-row">
+            <span class="detail-label">Node ID:</span>
+            <span class="detail-val-white" title="${fullCleanID}" style="cursor: help;">${shortID}</span>
+          </div>
           <div class="detail-row"><span class="detail-label">Status:</span>${statusHtml}</div>
           <div class="detail-row"><span class="detail-label">last sync:</span>${syncHtml}</div>
           <div class="detail-row"><span class="detail-label">Trend Window:</span>${windowHtml}</div>

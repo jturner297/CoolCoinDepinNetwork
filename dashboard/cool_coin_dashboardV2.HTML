@@ -596,7 +596,7 @@ Core Principles:
         hum: {
           label: "Humidity (%)",
           color: "#add8e6",
-          gradient: false,
+          gradient: true,
           unit: "%",
         },
         pres: {
@@ -608,9 +608,14 @@ Core Principles:
       };
 
       const Y_SCALES = {
-        temp: { min: 15, max: 30, step: 1 },
-        hum: { min: 0, max: 100, step: 20 },
-        pres: { min: 980, max: 1040, step: 10 },
+        // buffer: 2 means if temp is 19°C, the chart will show 17°C to 21°C
+        temp: { buffer: 2, step: 1 },
+
+        // buffer: 15 means if hum is 50%, the chart will show 35% to 65%
+        hum: { buffer: 15, step: 10 },
+
+        // Pressure is stable, so we usually just let it auto-scale or give it a small buffer
+        pres: { buffer: 4, step: 5 },
       };
 
       // ==========================================
@@ -843,6 +848,7 @@ Core Principles:
             btn.classList.add("active");
           }
         });
+        // FORCE the chart to respect our min/max values
 
         dataset.label = config.label;
         dataset.borderColor = config.color;
@@ -873,12 +879,39 @@ Core Principles:
 
       function renderChartFromCache() {
         if (!myChart || cachedChartData.length === 0) return;
+
         const plotData = cachedChartData.map((h) => h[currentMode]);
         const labels = cachedChartData.map((h) => h.timeStr.split(" ")[1]);
+
+        // --- NEW DYNAMIC SCALING LOGIC ---
+        if (plotData.length > 0) {
+          const dataMin = Math.min(...plotData);
+          const dataMax = Math.max(...plotData);
+          const config = Y_SCALES[currentMode];
+
+          // 1. Calculate limits based on data + buffer
+          let dynamicMin = dataMin - config.buffer;
+          let dynamicMax = dataMax + config.buffer;
+
+          // 2. Round ALL values to nice integers (fixes the weird decimal font issue)
+          dynamicMin = Math.floor(dynamicMin);
+          dynamicMax = Math.ceil(dynamicMax);
+
+          // 3. Apply to Chart
+          myChart.options.scales.y.min = dynamicMin;
+          myChart.options.scales.y.max = dynamicMax;
+
+          // Apply step size if defined (keeps grid lines neat)
+          if (config.step) {
+            myChart.options.scales.y.ticks.stepSize = config.step;
+          }
+        }
+        // ---------------------------------
 
         myChart.data.labels = labels;
         myChart.data.datasets[0].data = plotData;
 
+        // Update High/Low Text
         if (plotData.length > 0) {
           const high = Math.max(...plotData);
           const low = Math.min(...plotData);
@@ -890,6 +923,7 @@ Core Principles:
             1
           )}${unit}`;
         }
+
         myChart.update();
       }
 
@@ -923,22 +957,19 @@ Core Principles:
           windowHtml = `<span class="detail-val-white">${windowTxt}</span>`;
         }
 
-        // --- NEW LOGIC START ---
         const fullCleanID = cleanKey(id);
 
-        // Grab first 8 chars ... and last 8 chars
+        // Grab first 12 chars and last 12 chars
         const shortID =
           fullCleanID.length > 20
             ? fullCleanID.substring(0, 12) +
               "................" +
               fullCleanID.substring(fullCleanID.length - 12)
             : fullCleanID;
-        // --- NEW LOGIC END ---
 
-        // UPDATED HTML below:
-        // 1. Removed style="word-break: break-all" (prevent wrapping)
-        // 2. Added title="${fullCleanID}" (hover to see full key)
-        // 3. Displaying ${shortID} instead of the full key
+        // Removed style="word-break: break-all" (prevent wrapping)
+        // Added title="${fullCleanID}" (hover to see full key)
+        // Displaying ${shortID} instead of the full key
         container.innerHTML = `
           <h3 class="details-header">Details</h3>
           <div class="detail-row"><span class="detail-label">Node name:</span>${nameHtml}</div>

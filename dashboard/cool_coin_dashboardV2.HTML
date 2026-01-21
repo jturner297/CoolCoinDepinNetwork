@@ -474,11 +474,18 @@ Core Principles:
           <button id="serverSubmitBtn">Set</button>
         </div>
       </div>
-      <img
-        src="../_resources/CoolCoinLogo.png"
-        alt="Cool-Coin Logo"
-        class="logo-img"
-      />
+
+      <a
+        href="https://github.com/jturner297/CoolCoinDepinNetwork.git"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <img
+          src="../_resources/CoolCoinLogo.png"
+          alt="Cool-Coin Logo"
+          class="logo-img"
+        />
+      </a>
     </header>
 
     <div class="layout">
@@ -750,7 +757,7 @@ Core Principles:
           if (SERVER_URL) {
             try {
               const res = await fetch(
-                `${SERVER_URL}/resolve_nickname/${encodeURIComponent(val)}`
+                `${SERVER_URL}/resolve_nickname/${encodeURIComponent(val)}`,
               );
               if (res.ok) {
                 const data = await res.json();
@@ -845,8 +852,8 @@ Core Principles:
                 mode === "pres"
                   ? "pressure"
                   : mode === "hum"
-                  ? "humidity"
-                  : "temp"
+                    ? "humidity"
+                    : "temp",
               )
           ) {
             btn.classList.add("active");
@@ -862,7 +869,7 @@ Core Principles:
           dataset.fill = true;
           dataset.backgroundColor = createGradient(
             document.getElementById("trendChart").getContext("2d"),
-            config.color
+            config.color,
           );
         } else {
           dataset.fill = false;
@@ -886,7 +893,7 @@ Core Principles:
 
         const plotData = cachedChartData.map((h) => h[currentMode]);
         const labels = cachedChartData.map((h) =>
-          h.timeObj.toLocaleTimeString()
+          h.timeObj.toLocaleTimeString(),
         );
 
         // --- DYNAMIC SCALING (Kept from previous steps) ---
@@ -1113,21 +1120,18 @@ Core Principles:
 
           if (latestReal && nodeStatus !== "OFFLINE") {
             // SHOW DATA (Online OR Idle)
-            document.getElementById(
-              "tempDisplay"
-            ).textContent = `${latestReal.temp.toFixed(2)} °C`;
-            document.getElementById(
-              "presDisplay"
-            ).textContent = `${latestReal.pres.toFixed(2)} hPa`;
-            document.getElementById(
-              "humDisplay"
-            ).textContent = `${latestReal.hum.toFixed(2)} %`;
+            document.getElementById("tempDisplay").textContent =
+              `${latestReal.temp.toFixed(2)} °C`;
+            document.getElementById("presDisplay").textContent =
+              `${latestReal.pres.toFixed(2)} hPa`;
+            document.getElementById("humDisplay").textContent =
+              `${latestReal.hum.toFixed(2)} %`;
 
             renderDetailsPanel(nodeStatus, {
               id: currentNodeRaw,
               lastSync: latestReal.timeObj.toLocaleString(),
               windowTxt: `${Math.round(
-                (cachedChartData.length * 30) / 60
+                (cachedChartData.length * 30) / 60,
               )} minutes`,
               nodeName: fetchedName,
             });

@@ -331,7 +331,38 @@ def load_wallet(wallet_name):
     
     return public_key_pem # return the wallet address data
 
-
+def verify_and_register_nickname(server_ip, server_port, node_pubkey_pem, node_nickname):
+    """
+    Checks if the server knows this node's nickname. 
+    If not, it registers it.
+    """
+    # Clean the key for the URL (Server expects a clean string in the GET request)
+    clean_key = node_pubkey_pem.replace("-----BEGIN PUBLIC KEY-----", "") \
+                               .replace("-----END PUBLIC KEY-----", "") \
+                               .replace("\n", "") \
+                               .replace("\r", "") \
+                               .replace(" ", "")
+    
+    # URL to check status
+    check_url = f"http://{server_ip}:{server_port}/node_nickname/{clean_key}"
+    
+    try:
+        print(f"\nVerifying nickname '{node_nickname}' with server...")
+        
+        # 1. Ask Server
+        r = requests.get(check_url, timeout=2)
+        data = r.json()
+        
+        # 2. Check Response
+        # If status is NOT found, OR the registered name is different than our config
+        if data.get("status") != "found" or data.get("nickname") != node_nickname:
+            print("Nickname not registered or mismatch detected. Registering now...")
+            register_node_nickname(server_ip, server_port, node_pubkey_pem, node_nickname)
+        else:
+            print("Nickname successfully verified.")
+            
+    except Exception as e:
+        print(f"Warning: Could not verify nickname (Server might be down or unreachable): {e}")
 
 # --------------------
 # Menus
@@ -360,6 +391,9 @@ def main_menu():
             if public_key_pem  is None:           
                     print("\nCannot start mining: wallet public key not loaded. \nPlease update your wallet in the config menu first.")
                     continue  # force them to stay in main menu
+            
+            # CHECK REGISTRATION BEFORE STARTING
+            verify_and_register_nickname(server_ip, server_port, node_public_key_pem, node_nickname)
             
             print("\nStarting mining...")
             break

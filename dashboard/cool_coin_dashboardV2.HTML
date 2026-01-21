@@ -67,6 +67,7 @@ Core Principles:
         --online-green: #00ff55;
         --offline-red: #ff0059;
         --logo-blue: #add8e6;
+        --idle-yellow: #f6c445;
       }
 
       body {
@@ -316,6 +317,9 @@ Core Principles:
       }
       .detail-val-white {
         color: #ffffff;
+      }
+      .detail-val-yellow {
+        color: #ffc400;
       }
 
       #server-display {
@@ -881,27 +885,26 @@ Core Principles:
         if (!myChart || cachedChartData.length === 0) return;
 
         const plotData = cachedChartData.map((h) => h[currentMode]);
-        const labels = cachedChartData.map((h) => h.timeStr.split(" ")[1]);
+        const labels = cachedChartData.map((h) =>
+          h.timeObj.toLocaleTimeString()
+        );
 
-        // --- NEW DYNAMIC SCALING LOGIC ---
+        // --- DYNAMIC SCALING (Kept from previous steps) ---
         if (plotData.length > 0) {
           const dataMin = Math.min(...plotData);
           const dataMax = Math.max(...plotData);
           const config = Y_SCALES[currentMode];
 
-          // 1. Calculate limits based on data + buffer
           let dynamicMin = dataMin - config.buffer;
           let dynamicMax = dataMax + config.buffer;
 
-          // 2. Round ALL values to nice integers (fixes the weird decimal font issue)
+          // Rounding to fix font issues
           dynamicMin = Math.floor(dynamicMin);
           dynamicMax = Math.ceil(dynamicMax);
 
-          // 3. Apply to Chart
           myChart.options.scales.y.min = dynamicMin;
           myChart.options.scales.y.max = dynamicMax;
 
-          // Apply step size if defined (keeps grid lines neat)
           if (config.step) {
             myChart.options.scales.y.ticks.stepSize = config.step;
           }
@@ -911,17 +914,29 @@ Core Principles:
         myChart.data.labels = labels;
         myChart.data.datasets[0].data = plotData;
 
-        // Update High/Low Text
         if (plotData.length > 0) {
           const high = Math.max(...plotData);
           const low = Math.min(...plotData);
           const unit = MODES[currentMode].unit;
-          document.getElementById("highVal").textContent = `${high.toFixed(
-            1
-          )}${unit}`;
-          document.getElementById("lowVal").textContent = `${low.toFixed(
-            1
-          )}${unit}`;
+
+          // Find the index to get the time object
+          const highIndex = plotData.indexOf(high);
+          const lowIndex = plotData.indexOf(low);
+
+          // CONVERSION MAGIC: .toLocaleString() automatically uses the browser's timezone
+          const highTime = cachedChartData[highIndex].timeObj.toLocaleString();
+          const lowTime = cachedChartData[lowIndex].timeObj.toLocaleString();
+
+          const highEl = document.getElementById("highVal");
+          const lowEl = document.getElementById("lowVal");
+
+          highEl.textContent = `${high.toFixed(1)}${unit}`;
+          highEl.title = `${highTime}`; // Now shows "1/11/2026, 8:02:15 PM" (or your local equiv)
+          highEl.style.cursor = "help";
+
+          lowEl.textContent = `${low.toFixed(1)}${unit}`;
+          lowEl.title = `${lowTime}`;
+          lowEl.style.cursor = "help";
         }
 
         myChart.update();
@@ -940,26 +955,34 @@ Core Principles:
         const { id, lastSync, windowTxt, nodeName } = data;
         let nameHtml, statusHtml, syncHtml, windowHtml;
 
-        // Name Logic: "unknown" or empty -> Red. Otherwise -> Purple
+        // Name Logic
         if (!nodeName || nodeName.toLowerCase() === "unknown") {
           nameHtml = `<span class="detail-val-red">unknown</span>`;
         } else {
           nameHtml = `<span class="detail-val-purple">${nodeName}</span>`;
         }
 
+        // --- NEW STATUS LOGIC ---
         if (state === "OFFLINE") {
           statusHtml = `<span class="detail-val-red">Offline</span>`;
-          syncHtml = `<span class="detail-val-white">N/A</span>`;
+          // Show last known time if available, otherwise N/A
+          const timeText = lastSync ? lastSync : "N/A";
+          syncHtml = `<span class="detail-val-white">${timeText}</span>`;
           windowHtml = `<span class="detail-val-white">N/A</span>`;
+        } else if (state === "IDLE") {
+          // YELLOW STATUS
+          statusHtml = `<span class="detail-val-yellow">Idle (Lagging)</span>`;
+          syncHtml = `<span class="detail-val-white">${lastSync}</span>`;
+          windowHtml = `<span class="detail-val-white">${windowTxt}</span>`;
         } else {
+          // ONLINE (Green)
           statusHtml = `<span class="detail-val-green">Online</span>`;
           syncHtml = `<span class="detail-val-white">${lastSync}</span>`;
           windowHtml = `<span class="detail-val-white">${windowTxt}</span>`;
         }
+        // ------------------------
 
         const fullCleanID = cleanKey(id);
-
-        // Grab first 12 chars and last 12 chars
         const shortID =
           fullCleanID.length > 20
             ? fullCleanID.substring(0, 12) +
@@ -967,9 +990,6 @@ Core Principles:
               fullCleanID.substring(fullCleanID.length - 12)
             : fullCleanID;
 
-        // Removed style="word-break: break-all" (prevent wrapping)
-        // Added title="${fullCleanID}" (hover to see full key)
-        // Displaying ${shortID} instead of the full key
         container.innerHTML = `
           <h3 class="details-header">Details</h3>
           <div class="detail-row"><span class="detail-label">Node name:</span>${nameHtml}</div>
@@ -1044,8 +1064,26 @@ Core Principles:
 
           const smoothHistory = [];
           let lastAddedTime = 0;
+          const GAP_THRESHOLD_MS = 60000; // 60 seconds (1 minute gap = break line)
+
           rawHistory.forEach((point) => {
             const pointTime = point.timeObj.getTime();
+
+            // 1. Detect Gap: If time jumped > 60s, insert a 'null' point
+            if (
+              lastAddedTime !== 0 &&
+              pointTime - lastAddedTime > GAP_THRESHOLD_MS
+            ) {
+              smoothHistory.push({
+                timeObj: point.timeObj, // Use resumption time for label
+                timeStr: point.timeStr,
+                temp: null,
+                pres: null,
+                hum: null, // null breaks the line
+              });
+            }
+
+            // 2. Add Real Point
             if (pointTime - lastAddedTime >= MIN_TIME_GAP) {
               smoothHistory.push(point);
               lastAddedTime = pointTime;
@@ -1055,8 +1093,26 @@ Core Principles:
           cachedChartData = smoothHistory.slice(-60);
           const latestReal = rawHistory[rawHistory.length - 1];
 
+          // --- 3-STAGE STATUS LOGIC ---
+          const IDLE_THRESHOLD = 20; // Warn after 20s
+          const OFFLINE_THRESHOLD = 60; // Dead after 60s
+
+          let nodeStatus = "OFFLINE"; // Default assumption
+
           if (latestReal) {
-            // ONLINE
+            const now = new Date();
+            const diffSeconds = (now - latestReal.timeObj) / 1000;
+
+            if (diffSeconds < IDLE_THRESHOLD) {
+              nodeStatus = "ONLINE";
+            } else if (diffSeconds < OFFLINE_THRESHOLD) {
+              nodeStatus = "IDLE";
+            }
+          }
+          // ----------------------------
+
+          if (latestReal && nodeStatus !== "OFFLINE") {
+            // SHOW DATA (Online OR Idle)
             document.getElementById(
               "tempDisplay"
             ).textContent = `${latestReal.temp.toFixed(2)} °C`;
@@ -1067,9 +1123,9 @@ Core Principles:
               "humDisplay"
             ).textContent = `${latestReal.hum.toFixed(2)} %`;
 
-            renderDetailsPanel("ONLINE", {
+            renderDetailsPanel(nodeStatus, {
               id: currentNodeRaw,
-              lastSync: latestReal.timeStr,
+              lastSync: latestReal.timeObj.toLocaleString(),
               windowTxt: `${Math.round(
                 (cachedChartData.length * 30) / 60
               )} minutes`,
@@ -1077,11 +1133,16 @@ Core Principles:
             });
             renderChartFromCache();
           } else {
-            // OFFLINE
+            // HIDE DATA (Fully Offline)
+            let lastSeen = latestReal
+              ? latestReal.timeObj.toLocaleString()
+              : "Never";
+
             resetTopStats("Offline");
             renderDetailsPanel("OFFLINE", {
               id: currentNodeRaw,
               nodeName: fetchedName,
+              lastSync: lastSeen, // Allows us to see WHEN it died
             });
           }
         } catch (err) {

@@ -39,6 +39,7 @@ app.add_middleware(
     allow_credentials=True, # allow dashboard to include things like credentials or login info (unused)
     allow_methods=["*"], # allow all HTTP methods (GET, POST, PUT, DELETE). Crucial for dashboard operations
     allow_headers=["*"], # allows dashboard to send any header (unused)
+    expose_headers=["*"] # <--- ADD THIS LINE (Allows dashboard to read the 'Date' header)
 )
 
 # -----------------------------

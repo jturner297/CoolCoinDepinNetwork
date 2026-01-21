@@ -584,16 +584,16 @@ Core Principles:
       let isEditing = true;
       const MAX_NODES = 3;
 
-      // trackedNodes stores ONLY the immutable Public Keys
       let trackedNodes = [];
-
-      // nodeNameCache maps Public Keys -> Current Nicknames
-      // Example: { "MCow...": "jtpi" }
       let nodeNameCache = {};
+
+      // NEW: Heartbeat System
+      // Stores the timestamp (Browser Time) of the last time we saw FRESH data for a node
+      let lastHeartbeat = {}; // { "nodeKey": 170000000000 }
+      let lastKnownSig = {}; // { "nodeKey": "signature_string..." }
 
       let activeNode = null;
       let cachedChartData = [];
-      let lastFetchSuccessful = false;
       let myChart = null;
       let currentMode = "temp";
 
@@ -619,13 +619,8 @@ Core Principles:
       };
 
       const Y_SCALES = {
-        // buffer: 2 means if temp is 19°C, the chart will show 17°C to 21°C
         temp: { buffer: 2, step: 1 },
-
-        // buffer: 15 means if hum is 50%, the chart will show 35% to 65%
         hum: { buffer: 15, step: 10 },
-
-        // Pressure is stable, so we usually just let it auto-scale or give it a small buffer
         pres: { buffer: 4, step: 5 },
       };
 
@@ -642,9 +637,9 @@ Core Principles:
 
       function createGradient(ctx, color) {
         const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-        let baseColor = "rgba(227, 146, 250,"; // Default Purple
-        if (color === "#add8e6") baseColor = "rgba(173, 216, 230,"; // Blue
-        if (color === "#00ff55") baseColor = "rgba(0, 255, 85,"; // Green
+        let baseColor = "rgba(227, 146, 250,";
+        if (color === "#add8e6") baseColor = "rgba(173, 216, 230,";
+        if (color === "#00ff55") baseColor = "rgba(0, 255, 85,";
         gradient.addColorStop(0, `${baseColor} 0.5)`);
         gradient.addColorStop(1, `${baseColor} 0.0)`);
         return gradient;
@@ -664,12 +659,12 @@ Core Principles:
           const port = document.getElementById("serverPort").value.trim();
           if (!address || !port) return;
           SERVER_URL = `http://${address}:${port}`;
-          console.log("Server set to:", SERVER_URL);
           serverUrlSpan.textContent = SERVER_URL;
           serverEditDiv.style.display = "none";
           serverDisplayDiv.style.display = "flex";
           serverBtn.textContent = "Edit";
           isEditing = false;
+          // Trigger immediate fetch
           updateActiveNodeStats();
         } else {
           const [addr, prt] = SERVER_URL.replace("http://", "").split(":");
@@ -683,7 +678,7 @@ Core Principles:
       });
 
       // ==========================================
-      // UI: NODE MANAGEMENT (SIDEBAR)
+      // UI: NODE MANAGEMENT
       // ==========================================
       const nodeList = document.getElementById("node-list");
       const nodeInput = document.getElementById("nodeInput");
@@ -696,12 +691,9 @@ Core Principles:
           if (activeNode === idx) card.style.outline = "2px solid #e392fa";
 
           const spanName = document.createElement("span");
-
-          // LOOKUP: Check cache for a friendly name. If none, truncate the key.
           const friendlyName = nodeNameCache[key]
             ? nodeNameCache[key]
             : key.substring(0, 12) + "...";
-
           spanName.textContent = friendlyName;
 
           const trash = document.createElement("span");
@@ -721,17 +713,14 @@ Core Principles:
 
           card.appendChild(spanName);
           card.appendChild(trash);
-
           card.onclick = () => {
             activeNode = idx;
             renderNodes();
             updateActiveNodeStats();
           };
-
           nodeList.appendChild(card);
         });
 
-        // Handle Input State
         if (trackedNodes.length >= MAX_NODES) {
           nodeInput.disabled = true;
           nodeInput.placeholder = "Max nodes reached";
@@ -741,7 +730,6 @@ Core Principles:
         }
       }
 
-      // Search Logic: Resolves Names -> Keys
       nodeInput.addEventListener("keydown", async (e) => {
         if (e.key === "Enter") {
           const val = nodeInput.value.trim();
@@ -752,8 +740,6 @@ Core Principles:
           nodeInput.placeholder = "Searching...";
 
           let finalKey = val;
-
-          // 1. Try to resolve nickname via Server
           if (SERVER_URL) {
             try {
               const res = await fetch(
@@ -762,25 +748,22 @@ Core Principles:
               if (res.ok) {
                 const data = await res.json();
                 if (data.status === "found") {
-                  // It's a valid nickname!
                   finalKey = data.pubkey;
-                  // Update cache immediately so it shows up nice in the list
                   nodeNameCache[finalKey] = data.nickname;
                 }
               }
             } catch (err) {
-              console.warn("Could not resolve nickname, using raw input.");
+              console.warn("Nickname resolve failed");
             }
           }
 
-          // 2. Add to list (Prevent Duplicates)
           if (trackedNodes.includes(finalKey)) {
             alert("Node is already on the dashboard.");
           } else {
             trackedNodes.push(finalKey);
             activeNode = trackedNodes.length - 1;
-            renderNodes(); // Re-render sidebar to show new node
-            updateActiveNodeStats(); // Fetch data immediately
+            renderNodes();
+            updateActiveNodeStats();
           }
 
           nodeInput.value = "";
@@ -796,7 +779,6 @@ Core Principles:
       function initChart() {
         const ctx = document.getElementById("trendChart").getContext("2d");
         const config = MODES[currentMode];
-
         myChart = new Chart(ctx, {
           type: "line",
           data: {
@@ -812,8 +794,6 @@ Core Principles:
                 borderWidth: 2,
                 tension: 0.3,
                 pointRadius: 2,
-                pointHoverRadius: 6,
-                pointBackgroundColor: config.color,
                 fill: config.gradient,
               },
             ],
@@ -855,11 +835,9 @@ Core Principles:
                     ? "humidity"
                     : "temp",
               )
-          ) {
+          )
             btn.classList.add("active");
-          }
         });
-        // FORCE the chart to respect our min/max values
 
         dataset.label = config.label;
         dataset.borderColor = config.color;
@@ -891,67 +869,47 @@ Core Principles:
       function renderChartFromCache() {
         if (!myChart || cachedChartData.length === 0) return;
 
+        // Get the raw data (includes nulls for gaps)
         const plotData = cachedChartData.map((h) => h[currentMode]);
         const labels = cachedChartData.map((h) =>
           h.timeObj.toLocaleTimeString(),
         );
 
-        // --- DYNAMIC SCALING (Kept from previous steps) ---
-        if (plotData.length > 0) {
-          const dataMin = Math.min(...plotData);
-          const dataMax = Math.max(...plotData);
+        // --- THE FIX: Create a clean list of ONLY numbers ---
+        // This removes the 'null' gaps so Math.min doesn't see them as 0.
+        const validValues = plotData.filter((v) => v !== null && !isNaN(v));
+        // ---------------------------------------------------
+
+        if (validValues.length > 0) {
+          const dataMin = Math.min(...validValues); // Use validValues, not plotData
+          const dataMax = Math.max(...validValues);
           const config = Y_SCALES[currentMode];
 
-          let dynamicMin = dataMin - config.buffer;
-          let dynamicMax = dataMax + config.buffer;
-
-          // Rounding to fix font issues
-          dynamicMin = Math.floor(dynamicMin);
-          dynamicMax = Math.ceil(dynamicMax);
+          let dynamicMin = Math.floor(dataMin - config.buffer);
+          let dynamicMax = Math.ceil(dataMax + config.buffer);
 
           myChart.options.scales.y.min = dynamicMin;
           myChart.options.scales.y.max = dynamicMax;
-
-          if (config.step) {
+          if (config.step)
             myChart.options.scales.y.ticks.stepSize = config.step;
-          }
         }
-        // ---------------------------------
 
         myChart.data.labels = labels;
-        myChart.data.datasets[0].data = plotData;
+        myChart.data.datasets[0].data = plotData; // We still plot 'plotData' so the visual gap remains
 
-        if (plotData.length > 0) {
-          const high = Math.max(...plotData);
-          const low = Math.min(...plotData);
+        if (validValues.length > 0) {
+          const high = Math.max(...validValues);
+          const low = Math.min(...validValues);
           const unit = MODES[currentMode].unit;
 
-          // Find the index to get the time object
-          const highIndex = plotData.indexOf(high);
-          const lowIndex = plotData.indexOf(low);
-
-          // CONVERSION MAGIC: .toLocaleString() automatically uses the browser's timezone
-          const highTime = cachedChartData[highIndex].timeObj.toLocaleString();
-          const lowTime = cachedChartData[lowIndex].timeObj.toLocaleString();
-
-          const highEl = document.getElementById("highVal");
-          const lowEl = document.getElementById("lowVal");
-
-          highEl.textContent = `${high.toFixed(1)}${unit}`;
-          highEl.title = `${highTime}`; // Now shows "1/11/2026, 8:02:15 PM" (or your local equiv)
-          highEl.style.cursor = "help";
-
-          lowEl.textContent = `${low.toFixed(1)}${unit}`;
-          lowEl.title = `${lowTime}`;
-          lowEl.style.cursor = "help";
+          document.getElementById("highVal").textContent =
+            `${high.toFixed(1)}${unit}`;
+          document.getElementById("lowVal").textContent =
+            `${low.toFixed(1)}${unit}`;
         }
-
         myChart.update();
       }
 
-      // ==========================================
-      // DATA FETCHING & UI UPDATE
-      // ==========================================
       function renderDetailsPanel(state, data) {
         const container = document.querySelector(".details-text");
         if (state === "EMPTY") {
@@ -962,39 +920,30 @@ Core Principles:
         const { id, lastSync, windowTxt, nodeName } = data;
         let nameHtml, statusHtml, syncHtml, windowHtml;
 
-        // Name Logic
         if (!nodeName || nodeName.toLowerCase() === "unknown") {
           nameHtml = `<span class="detail-val-red">unknown</span>`;
         } else {
           nameHtml = `<span class="detail-val-purple">${nodeName}</span>`;
         }
 
-        // --- NEW STATUS LOGIC ---
         if (state === "OFFLINE") {
           statusHtml = `<span class="detail-val-red">Offline</span>`;
-          // Show last known time if available, otherwise N/A
-          const timeText = lastSync ? lastSync : "N/A";
-          syncHtml = `<span class="detail-val-white">${timeText}</span>`;
+          syncHtml = `<span class="detail-val-white">${lastSync || "N/A"}</span>`;
           windowHtml = `<span class="detail-val-white">N/A</span>`;
         } else if (state === "IDLE") {
-          // YELLOW STATUS
           statusHtml = `<span class="detail-val-yellow">Idle (Lagging)</span>`;
           syncHtml = `<span class="detail-val-white">${lastSync}</span>`;
           windowHtml = `<span class="detail-val-white">${windowTxt}</span>`;
         } else {
-          // ONLINE (Green)
           statusHtml = `<span class="detail-val-green">Online</span>`;
           syncHtml = `<span class="detail-val-white">${lastSync}</span>`;
           windowHtml = `<span class="detail-val-white">${windowTxt}</span>`;
         }
-        // ------------------------
 
         const fullCleanID = cleanKey(id);
         const shortID =
           fullCleanID.length > 20
-            ? fullCleanID.substring(0, 12) +
-              "................" +
-              fullCleanID.substring(fullCleanID.length - 12)
+            ? fullCleanID.substring(0, 12) + "..."
             : fullCleanID;
 
         container.innerHTML = `
@@ -1005,152 +954,215 @@ Core Principles:
             <span class="detail-val-white" title="${fullCleanID}" style="cursor: help;">${shortID}</span>
           </div>
           <div class="detail-row"><span class="detail-label">Status:</span>${statusHtml}</div>
-          <div class="detail-row"><span class="detail-label">last sync:</span>${syncHtml}</div>
-          <div class="detail-row"><span class="detail-label">Trend Window:</span>${windowHtml}</div>
+          <div class="detail-row"><span class="detail-label">Last sync:</span>${syncHtml}</div>
+          <div class="detail-row"><span class="detail-label">Uptime:</span>${windowHtml}</div>
         `;
       }
 
+      // ==========================================
+      // MAIN DATA LOOP
+      // ==========================================
       async function updateActiveNodeStats() {
         if (!SERVER_URL) return;
+
         if (activeNode === null || !trackedNodes[activeNode]) {
           resetStats("EMPTY");
           return;
         }
 
         const currentNodeRaw = trackedNodes[activeNode];
-        const cleanID = cleanKey(currentNodeRaw); // <--- We use this for the URL now
-        const MIN_TIME_GAP = 0;
+        const cleanID = cleanKey(currentNodeRaw);
+        const t = Date.now(); // Cache Busting
 
         try {
-          // 1. Fetch Chain, Mempool, AND Nickname
-          // CHANGE: We now pass 'cleanID' to the server, not the messy 'currentNodeRaw'
-          const [chainRes, mempoolRes, nameRes] = await Promise.all([
-            fetch(`${SERVER_URL}/chain`),
-            fetch(`${SERVER_URL}/mempool`),
-            fetch(`${SERVER_URL}/node_nickname/${encodeURIComponent(cleanID)}`),
+          // 1. Fetch Data
+          const [chainRes, mempoolRes] = await Promise.all([
+            fetch(`${SERVER_URL}/chain?t=${t}`),
+            fetch(`${SERVER_URL}/mempool?t=${t}`),
           ]);
-          if (!chainRes.ok || !mempoolRes.ok) throw new Error("Server Error");
+
+          if (!chainRes.ok || !mempoolRes.ok) throw new Error("API Error");
+
+          // Server Time for fallback
+          const serverHeaderTime = chainRes.headers.get("Date");
+          const serverNow = serverHeaderTime
+            ? new Date(serverHeaderTime)
+            : new Date();
+
           const chain = await chainRes.json();
           const mempool = await mempoolRes.json();
 
-          // 2. Process & Update Name Cache
-          let fetchedName = "unknown";
-          if (nameRes.ok) {
-            const nameJson = await nameRes.json();
-            if (nameJson.status === "found") {
-              fetchedName = nameJson.nickname;
-              // CRITICAL: Update the global cache
-              nodeNameCache[currentNodeRaw] = fetchedName;
-            }
-          }
+          // 2. Nickname (Non-blocking)
+          fetch(
+            `${SERVER_URL}/node_nickname/${encodeURIComponent(cleanID)}?t=${t}`,
+          )
+            .then((r) => r.json())
+            .then((data) => {
+              if (data.status === "found") {
+                nodeNameCache[currentNodeRaw] = data.nickname;
+                const card =
+                  document.querySelectorAll(".node-card span")[activeNode];
+                if (card && card.textContent !== data.nickname) renderNodes();
+              }
+            })
+            .catch((e) => {});
 
-          // 3. Re-render the sidebar to reflect any name changes
-          renderNodes();
+          if (
+            activeNode === null ||
+            trackedNodes[activeNode] !== currentNodeRaw
+          )
+            return;
 
-          // 4. Process Chain Data
+          // 3. Process History
           let rawHistory = [];
-          const processTx = (tx) => {
+          const processTx = (tx, isMempool) => {
             if (
               tx.type === "MINT" &&
               cleanKey(tx.from_addr) === cleanID &&
               tx.reading
             ) {
-              const cleanTimeStr = tx.timestamp.replace(" UTC", "");
-              rawHistory.push({
-                timeObj: new Date(cleanTimeStr + "Z"),
-                timeStr: tx.timestamp,
-                temp: tx.reading.temperature,
-                pres: tx.reading.pressure,
-                hum: tx.reading.humidity,
-              });
+              try {
+                const cleanTimeStr = tx.timestamp.replace(" UTC", "").trim();
+                const [dPart, tPart] = cleanTimeStr.split(" ");
+                const [mm, dd, yyyy] = dPart.split("-");
+                const [hh, min, ss] = tPart.split(":");
+                const txDateObj = new Date(
+                  Date.UTC(yyyy, mm - 1, dd, hh, min, ss),
+                );
+
+                if (!isNaN(txDateObj.getTime())) {
+                  rawHistory.push({
+                    timeObj: txDateObj,
+                    timeStr: tx.timestamp,
+                    temp: tx.reading.temperature,
+                    pres: tx.reading.pressure,
+                    hum: tx.reading.humidity,
+                    isPending: isMempool,
+                    signature: tx.signature, // <--- Crucial for Heartbeat
+                  });
+                }
+              } catch (e) {}
             }
           };
-          chain.forEach((block) => block.transactions.forEach(processTx));
-          mempool.forEach(processTx);
+
+          chain.forEach((b) =>
+            b.transactions.forEach((tx) => processTx(tx, false)),
+          );
+          mempool.forEach((tx) => processTx(tx, true));
           rawHistory.sort((a, b) => a.timeObj - b.timeObj);
 
-          const smoothHistory = [];
-          let lastAddedTime = 0;
-          const GAP_THRESHOLD_MS = 60000; // 60 seconds (1 minute gap = break line)
+          // 4. Graph Data Calculation
+          let smoothHistory = [];
+          let totalActiveMs = 0;
+          let lastTime = 0;
 
-          rawHistory.forEach((point) => {
-            const pointTime = point.timeObj.getTime();
+          const IDLE_CUTOFF = 20000;
 
-            // 1. Detect Gap: If time jumped > 60s, insert a 'null' point
-            if (
-              lastAddedTime !== 0 &&
-              pointTime - lastAddedTime > GAP_THRESHOLD_MS
-            ) {
-              smoothHistory.push({
-                timeObj: point.timeObj, // Use resumption time for label
-                timeStr: point.timeStr,
-                temp: null,
-                pres: null,
-                hum: null, // null breaks the line
-              });
-            }
-
-            // 2. Add Real Point
-            if (pointTime - lastAddedTime >= MIN_TIME_GAP) {
-              smoothHistory.push(point);
-              lastAddedTime = pointTime;
-            }
-          });
-
-          cachedChartData = smoothHistory.slice(-60);
-          const latestReal = rawHistory[rawHistory.length - 1];
-
-          // --- 3-STAGE STATUS LOGIC ---
-          const IDLE_THRESHOLD = 20; // Warn after 20s
-          const OFFLINE_THRESHOLD = 60; // Dead after 60s
-
-          let nodeStatus = "OFFLINE"; // Default assumption
-
-          if (latestReal) {
-            const now = new Date();
-            const diffSeconds = (now - latestReal.timeObj) / 1000;
-
-            if (diffSeconds < IDLE_THRESHOLD) {
-              nodeStatus = "ONLINE";
-            } else if (diffSeconds < OFFLINE_THRESHOLD) {
-              nodeStatus = "IDLE";
+          if (rawHistory.length > 0) {
+            smoothHistory.push(rawHistory[0]);
+            lastTime = rawHistory[0].timeObj.getTime();
+            for (let i = 1; i < rawHistory.length; i++) {
+              const point = rawHistory[i];
+              const pTime = point.timeObj.getTime();
+              const diff = pTime - lastTime;
+              if (diff < IDLE_CUTOFF && diff > 0) totalActiveMs += diff;
+              if (diff > 60000)
+                smoothHistory.push({
+                  timeObj: point.timeObj,
+                  temp: null,
+                  pres: null,
+                  hum: null,
+                });
+              if (diff >= 1000) {
+                smoothHistory.push(point);
+                lastTime = pTime;
+              }
             }
           }
-          // ----------------------------
+          cachedChartData = smoothHistory.slice(-60);
 
+          // 5. Time Window Text
+          const days = Math.floor(totalActiveMs / 86400000);
+          const hours = Math.floor((totalActiveMs % 86400000) / 3600000);
+          const mins = Math.floor((totalActiveMs % 3600000) / 60000);
+          const secs = Math.floor((totalActiveMs % 60000) / 1000); // <--- Calculate seconds
+
+          let windowTxt = "";
+
+          if (days > 0) {
+            windowTxt = `${days}d ${hours}h ${mins}m`;
+          } else if (hours > 0) {
+            windowTxt = `${hours}h ${mins}m ${secs}s`;
+          } else {
+            // For less than an hour, show minutes AND seconds
+            windowTxt = `${mins}m ${secs}s`;
+          }
+
+          // 6. ROBUST STATUS LOGIC (HEARTBEAT)
+          const latestReal = rawHistory[rawHistory.length - 1];
+          let nodeStatus = "OFFLINE";
+
+          if (latestReal) {
+            // A. HEARTBEAT CHECK
+            // If we see a signature we haven't seen before, the node is ALIVE.
+            // We update our local 'lastHeartbeat' timestamp to NOW.
+            if (lastKnownSig[cleanID] !== latestReal.signature) {
+              lastKnownSig[cleanID] = latestReal.signature;
+              lastHeartbeat[cleanID] = Date.now();
+            }
+
+            // B. Determine Status based on Heartbeat
+            const lastBeat = lastHeartbeat[cleanID] || 0;
+            const msSinceBeat = Date.now() - lastBeat;
+
+            if (latestReal.isPending) {
+              nodeStatus = "ONLINE";
+              // Keep heartbeat fresh while pending
+              lastHeartbeat[cleanID] = Date.now();
+            }
+            // If we received new data within the last 60 seconds (Client Time)
+            else if (msSinceBeat < 60000) {
+              nodeStatus = msSinceBeat < 20000 ? "ONLINE" : "IDLE";
+            }
+            // Fallback: If this is the first load (no heartbeat yet), use Server Time
+            else {
+              const serverDiff = (serverNow - latestReal.timeObj) / 1000;
+              if (serverDiff < 25)
+                nodeStatus = "ONLINE"; // slightly lenient
+              else if (serverDiff < 60) nodeStatus = "IDLE";
+              else nodeStatus = "OFFLINE";
+            }
+          }
+
+          // 7. Render
+          const currentName = nodeNameCache[currentNodeRaw] || "unknown";
           if (latestReal && nodeStatus !== "OFFLINE") {
-            // SHOW DATA (Online OR Idle)
             document.getElementById("tempDisplay").textContent =
               `${latestReal.temp.toFixed(2)} °C`;
             document.getElementById("presDisplay").textContent =
               `${latestReal.pres.toFixed(2)} hPa`;
             document.getElementById("humDisplay").textContent =
               `${latestReal.hum.toFixed(2)} %`;
-
             renderDetailsPanel(nodeStatus, {
               id: currentNodeRaw,
-              lastSync: latestReal.timeObj.toLocaleString(),
-              windowTxt: `${Math.round(
-                (cachedChartData.length * 30) / 60,
-              )} minutes`,
-              nodeName: fetchedName,
+              lastSync: latestReal.timeObj.toLocaleTimeString(),
+              windowTxt,
+              nodeName: currentName,
             });
             renderChartFromCache();
           } else {
-            // HIDE DATA (Fully Offline)
             let lastSeen = latestReal
               ? latestReal.timeObj.toLocaleString()
               : "Never";
-
             resetTopStats("Offline");
             renderDetailsPanel("OFFLINE", {
               id: currentNodeRaw,
-              nodeName: fetchedName,
-              lastSync: lastSeen, // Allows us to see WHEN it died
+              nodeName: currentName,
+              lastSync: lastSeen,
             });
           }
         } catch (err) {
-          console.error("Fetch failed:", err);
+          console.error("Sync Error:", err);
           resetStats("OFFLINE");
         }
       }
@@ -1170,26 +1182,32 @@ Core Principles:
       }
 
       function resetStats(mode) {
-        const msg = mode === "EMPTY" ? "--" : "Offline";
-        resetTopStats(msg);
-        if (mode === "EMPTY") {
-          renderDetailsPanel("EMPTY", {});
-        } else {
-          const currentID =
+        resetTopStats(mode === "EMPTY" ? "--" : "Offline");
+        if (mode === "EMPTY") renderDetailsPanel("EMPTY", {});
+        else {
+          const id =
             activeNode !== null && trackedNodes[activeNode]
               ? trackedNodes[activeNode]
               : "Unknown";
-          // Try to get name from cache if we have it
-          const name = nodeNameCache[currentID] || "unknown";
-          renderDetailsPanel("OFFLINE", { id: currentID, nodeName: name });
+          renderDetailsPanel("OFFLINE", {
+            id: id,
+            nodeName: nodeNameCache[id] || "unknown",
+          });
         }
       }
 
-      // Initialize
+      // Start
       initChart();
       setGraphMode(currentMode);
       renderNodes();
-      setInterval(updateActiveNodeStats, 2000);
+
+      // RECURSIVE LOOP (Prevents network pile-up)
+      function startLoop() {
+        updateActiveNodeStats().finally(() => {
+          setTimeout(startLoop, 2000);
+        });
+      }
+      startLoop();
     </script>
   </body>
 </html>

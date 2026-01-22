@@ -303,6 +303,14 @@
       .detail-val-green {
         color: var(--online-green);
       }
+      /* --- FIXED: Added Missing Status Colors --- */
+      .detail-val-yellow {
+        color: var(--idle-yellow);
+      }
+      .detail-val-red {
+        color: var(--offline-red);
+      }
+      /* ------------------------------------------ */
       .detail-val-white {
         color: #fff;
         word-break: break-all;
@@ -649,8 +657,7 @@
               ? " active-wallet"
               : "");
           const nameSpan = document.createElement("span");
-          nameSpan.textContent =
-            "Wallet " + (idx + 1) + ": " + key.substring(0, 8) + "...";
+          nameSpan.textContent = key.substring(0, 8) + "...";
           const delSpan = document.createElement("span");
           delSpan.textContent = "✕";
           delSpan.onclick = (e) => {
@@ -877,6 +884,13 @@
           resetTopStats("--");
         }
 
+        // --- FIXED: Calculate Last Sync ---
+        let lastSyncStr = "Never";
+        if (latest) {
+          lastSyncStr = latest.timeObj.toLocaleTimeString();
+        }
+        // ----------------------------------
+
         const mins = Math.floor(totalActiveMs / 60000);
         const secs = Math.floor((totalActiveMs % 60000) / 1000);
         const cName = nodeNameCache[currentNodeRaw] || "unknown";
@@ -893,6 +907,7 @@
            <div class="detail-row"><span class="detail-label">Node name:</span><span class="detail-val-purple">${cName}</span></div>
            <div class="detail-row"><span class="detail-label">Node ID:</span><span class="detail-val-white">${cId}</span></div>
            <div class="detail-row"><span class="detail-label">Status:</span>${statusHtml}</div>
+           <div class="detail-row"><span class="detail-label">Last Sync:</span><span class="detail-val-white">${lastSyncStr}</span></div>
            <div class="detail-row"><span class="detail-label">Active Time:</span><span class="detail-val-white">${mins}m ${secs}s</span></div>
         `;
       }

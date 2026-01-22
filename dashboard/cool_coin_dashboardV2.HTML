@@ -1,41 +1,3 @@
-<!--
-===========================================================
-COOL-COIN DASHBOARD V2 (Work in Progress) — Overview
-Author: Justin Turner
-
-Purpose:
-This dashboard is designed primarily to **track nodes** in the Cool-Coin network, 
-with wallet tracking as a secondary feature. It provides a real-time, interactive 
-interface for monitoring network health, node status, and associated wallet activity.
-
-Core Principles:
-
-1. Node-Centric Design:
-   - Nodes are the primary unit of monitoring; users can add up to MAX_NODES nodes.
-   - Each node has a dynamic status card reflecting online/offline state, uptime, 
-     last validation time, and other metrics.
-   - Active node selection highlights the currently monitored node, which drives 
-     secondary wallet and stats updates.
-
-2. Wallet Integration (Secondary):
-   - Wallets are tied to the currently active node for context-specific data.
-   - Users can input a wallet address to track confirmed and pending balances, 
-     latest transactions, and associated readings (temperature, pressure, humidity).
-   - Wallet tracking is intentionally secondary, ensuring node monitoring remains central.
-
-3. Real-Time Updates:
-   - Node statuses and wallet data are automatically refreshed at regular intervals.
-   - Fetches use the current SERVER_URL to connect dynamically to the Cool-Coin server.
-   - Error handling ensures the dashboard remains stable even if the server is unreachable.
-
-4. User Interaction & Constraints:
-   - Nodes are added via an input box with a maximum limit to prevent UI overload.
-   - Nodes and wallet data are displayed clearly with visual cues (colors, outlines) 
-     for online/offline or active state.
-   - Users can easily remove tracked nodes with the cross icon
-===========================================================
--->
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -43,16 +5,12 @@ Core Principles:
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cool-Coin Network Dashboard</title>
-    <!-- Sets the title of the web page, shown in browser tabs. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <!-- Preconnects to Google Fonts to speed up font loading. -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Another optimization for loading Google Fonts. 'crossorigin' allows the font to be used across domains. -->
     <link
       href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
       rel="stylesheet"
     />
-    <!-- Imports the "DM Sans" font from Google Fonts so it can be used in the page. -->
 
     <style>
       :root {
@@ -62,11 +20,11 @@ Core Principles:
         --card-bg: #151515;
         --node-card-bg: #141414;
         --accent-purple: #e392fa;
+        --accent-blue: #87ceeb;
         --text-main: #ffffff;
         --text-dim: #a0a0a0;
         --online-green: #00ff55;
         --offline-red: #ff0059;
-        --logo-blue: #add8e6;
         --idle-yellow: #f6c445;
       }
 
@@ -81,7 +39,7 @@ Core Principles:
         overflow: hidden;
       }
 
-      /* Top Black Header */
+      /* Header */
       header {
         background-color: var(--header-bg);
         padding: 15px 30px;
@@ -89,25 +47,22 @@ Core Principles:
         justify-content: space-between;
         align-items: center;
         z-index: 10;
+        flex-shrink: 0;
       }
-
       .header-left h1 {
         color: var(--accent-purple);
         font-size: 1.6rem;
         font-weight: 1000;
-
-        margin-top: 0px;
-        margin-bottom: -3px;
+        margin: 0 0 -3px 0;
       }
-
       .header-left p {
         font-size: 0.95rem;
         font-weight: 500;
         color: var(--text-main);
-        margin-top: 0px;
-        margin-bottom: 10px;
+        margin: 0 0 10px 0;
       }
 
+      /* Server Controls */
       .server-input {
         background: #444;
         border: none;
@@ -116,212 +71,14 @@ Core Principles:
         color: #ccc;
         font-family: "DM Sans", sans-serif;
         font-size: 0.8rem;
-        text-align: left;
       }
-      .server-input-group {
-        width: 200px; /* fixed*/
-      }
-
       .server-input.address {
-        width: 75px; /* fixed width */
+        width: 75px;
         margin-right: 5px;
       }
-
       .server-input.port {
-        width: 50px; /* fixed width */
+        width: 50px;
       }
-
-      /* Logo Badge */
-      .logo-img {
-        width: 80px; /* Same size as old badge */
-        height: 80px; /* Same height */
-      }
-
-      /* Dashboard Body Layout */
-      .layout {
-        display: flex;
-        flex: 1;
-      }
-
-      /* Sidebar Nodes */
-      aside {
-        width: 250px;
-        background-color: var(--sidebar-bg);
-        padding: 30px 20px;
-
-        display: flex;
-        flex-direction: column;
-      }
-
-      aside h3 {
-        color: var(--accent-purple);
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-
-        margin-top: -13px;
-        margin-bottom: 6px; /* tweak this value */
-      }
-
-      #node-list {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .node-card {
-        background: var(--node-card-bg);
-        padding: 15px;
-        border-radius: 12px;
-
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      }
-      .node-card:not(.node-input-card) {
-        cursor: pointer;
-        height: 35px; /* sets a fixed “fat” height */
-        padding: 20px;
-      }
-
-      /* Force the input to always be text cursor */
-      .node-input-card .node-input {
-        cursor: text;
-      }
-      .node-input-card {
-        margin-bottom: 15px;
-      }
-
-      .node-input-card .node-input {
-        background: transparent;
-        border: none;
-        color: #ccc;
-        width: 100%;
-        font-family: "DM Sans", sans-serif;
-        font-size: 0.85rem;
-      }
-
-      .node-input-card .node-input:focus {
-        outline: none;
-      }
-
-      .status-online {
-        color: var(--online-green);
-        font-size: 0.75rem;
-      }
-      .status-offline {
-        color: var(--offline-red);
-        font-size: 0.75rem;
-      }
-
-      /* Main Dashboard Content */
-      main {
-        display: grid;
-        grid-template-columns: 440px minmax(300px, 600px); /* left fixed, right min 300px, max 600px */
-        grid-gap: 30px; /* space between left and right columns */
-        padding: 0px 40px; /* optional: reduce top padding so sections start higher */
-      }
-      .stat-card,
-      .wallet-card {
-        max-width: 100%; /* they stay within the 320px column */
-      }
-
-      section h2 {
-        color: var(--accent-purple);
-        font-weight: 800;
-        font-size: 1.3rem;
-        margin-bottom: 5px;
-      }
-
-      .stat-card {
-        background: var(--card-bg);
-        padding: 17px;
-        border-radius: 15px;
-        margin-bottom: 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .stat-label {
-        color: var(--text-dim);
-        font-size: 1.8rem;
-      }
-      .stat-value {
-        font-size: 2.2rem;
-        font-weight: 500;
-      }
-
-      .trends-graph-placeholder {
-        background: var(--card-bg);
-        border-radius: 20px;
-        height: 200px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-        color: #f6c445; /* Yellow/Gold text from image */
-        padding: 40px;
-        font-size: 1.2rem;
-        line-height: 1.4;
-      }
-
-      .wallet-card {
-        background: var(--card-bg);
-        padding: 30px;
-        border-radius: 20px;
-        height: 100px;
-      }
-
-      .wallet-input {
-        width: 100%;
-        background: #e0e0e0;
-        border: none;
-        padding: 12px 20px;
-        border-radius: 10px;
-        font-family: "DM Sans", sans-serif;
-        box-sizing: border-box;
-      }
-
-      .details-text {
-        margin-top: 20px;
-        font-family: "DM Sans", sans-serif;
-        font-size: 0.95rem;
-        line-height: 1.6;
-      }
-
-      .details-header {
-        margin: 0 0 8px 0;
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #ffffff;
-      }
-
-      .detail-row {
-        display: flex;
-        gap: 8px; /* Space between label and value */
-        margin-bottom: 2px;
-      }
-
-      .detail-label {
-        color: #ffffff; /* White label */
-      }
-
-      .detail-val-purple {
-        color: #e392fa;
-      }
-      .detail-val-red {
-        color: #ff0059;
-      }
-      .detail-val-green {
-        color: #00ff55;
-      }
-      .detail-val-white {
-        color: #ffffff;
-      }
-      .detail-val-yellow {
-        color: #ffc400;
-      }
-
       #server-display {
         display: flex;
         align-items: center;
@@ -339,31 +96,13 @@ Core Principles:
         color: #ccc;
         font-size: 0.8rem;
       }
-
-      #server-display button {
-        background: #444;
-        border: none;
-        border-radius: 12px;
-        padding: 2px 8px;
-        color: #ccc;
-        cursor: pointer;
-        font-family: "DM Sans", sans-serif;
-        font-size: 0.75rem;
-      }
-
-      #server-display button:hover {
-        background: #555;
-      }
       #server-container {
         width: 245px;
         height: 28px;
         display: flex;
         align-items: center;
         gap: 6px;
-        margin-top: 0px;
-        margin-bottom: -5px;
       }
-
       #serverSubmitBtn {
         background: var(--accent-purple);
         border: none;
@@ -374,35 +113,219 @@ Core Principles:
         font-size: 0.75rem;
         cursor: pointer;
       }
-
-      #serverSubmitBtn:hover {
-        background: #555;
+      .logo-img {
+        width: 80px;
+        height: 80px;
       }
 
-      /* 1. Target the text (the first span inside the card) */
+      /* Layout */
+      .layout {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* Sidebar */
+      aside {
+        width: 250px;
+        background-color: var(--sidebar-bg);
+        padding: 30px 20px;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        flex-shrink: 0;
+      }
+      aside h3 {
+        color: var(--accent-purple);
+        margin-bottom: 10px;
+        font-size: 1.1rem;
+      }
+      aside h3.wallet-header {
+        color: var(--accent-blue);
+        margin-top: 30px;
+      }
+
+      .node-card {
+        background: var(--node-card-bg);
+        padding: 15px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        margin-bottom: 10px;
+        transition: outline 0.1s;
+      }
+      .node-card.active-node {
+        outline: 2px solid var(--accent-purple);
+      }
+      .node-card.active-wallet {
+        outline: 2px solid var(--accent-blue);
+      }
+
+      .node-input-card {
+        cursor: text;
+        margin-bottom: 15px;
+        padding: 12px 15px;
+        transition: opacity 0.3s;
+      }
+      .node-input {
+        background: transparent;
+        border: none;
+        color: #ccc;
+        width: 100%;
+        font-family: "DM Sans", sans-serif;
+        font-size: 0.85rem;
+        outline: none;
+      }
+
       .node-card span:first-child {
-        flex: 1; /* Grow to fill available space */
-        white-space: nowrap; /* Force text onto one line */
-        overflow: hidden; /* Hide anything that spills out */
-        text-overflow: ellipsis; /* Add "..." at the end */
-        min-width: 0; /* CRITICAL: Allows flex child to shrink below content size */
-        margin-right: 10px; /* Add some breathing room before the trash icon */
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+        margin-right: 10px;
+        font-size: 0.9rem;
       }
-
-      /* 2. Target the trash icon (the last span) */
       .node-card span:last-child {
-        flex-shrink: 0; /* Never let the trash icon get squished */
+        flex-shrink: 0;
+        color: #666;
+        font-weight: bold;
+      }
+      .node-card span:last-child:hover {
+        color: #fff;
       }
 
-      /* Graph Tabs Styling */
+      /* Main Content */
+      main {
+        flex: 1;
+        padding: 20px 40px;
+        overflow-y: auto;
+        max-width: 1000px;
+        margin-right: auto;
+      }
+
+      /* View Containers */
+      .view-section {
+        display: none;
+      }
+      .view-section.active {
+        display: block;
+      }
+
+      /* Stats Grid */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        margin-bottom: 30px;
+      }
+      .stat-card {
+        background: var(--card-bg);
+        padding: 20px;
+        border-radius: 15px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .stat-label {
+        color: var(--text-dim);
+        font-size: 0.9rem;
+        margin-bottom: 5px;
+      }
+      .stat-value {
+        font-size: 1.8rem;
+        font-weight: 500;
+      }
+      .wallet-val {
+        color: var(--accent-blue);
+      }
+
+      /* Transaction History List */
+      .tx-history-container {
+        background: var(--card-bg);
+        border-radius: 20px;
+        padding: 20px;
+        height: 240px;
+        overflow-y: auto;
+      }
+      .tx-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 0;
+        border-bottom: 1px solid #222;
+        font-size: 0.9rem;
+      }
+      .tx-row:last-child {
+        border-bottom: none;
+      }
+      .tx-type-mint {
+        color: var(--online-green);
+        font-weight: bold;
+      }
+      .tx-type-transfer {
+        color: var(--idle-yellow);
+        font-weight: bold;
+      }
+      .tx-time {
+        color: var(--text-dim);
+        font-size: 0.8rem;
+      }
+      .tx-amount {
+        font-family: monospace;
+        font-size: 1rem;
+      }
+
+      /* Details Panel */
+      .details-text {
+        margin-top: 20px;
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+      .details-header {
+        margin: 0 0 8px 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--accent-purple);
+      }
+      .detail-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .detail-val-purple {
+        color: var(--accent-purple);
+      }
+      .detail-val-blue {
+        color: var(--accent-blue);
+      }
+      .detail-val-green {
+        color: var(--online-green);
+      }
+      .detail-val-white {
+        color: #fff;
+        word-break: break-all;
+      }
+
+      /* Graph Styles */
+      .trends-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 15px;
+      }
+      .trends-header h2 {
+        color: var(--accent-purple);
+        margin: 0;
+      }
       .graph-tabs {
+        display: flex;
+        gap: 5px;
         background: #222;
         padding: 4px;
         border-radius: 8px;
-        display: flex;
-        gap: 5px;
       }
-
       .graph-tabs .tab {
         background: transparent;
         border: none;
@@ -411,38 +334,11 @@ Core Principles:
         border-radius: 6px;
         cursor: pointer;
         font-family: "DM Sans", sans-serif;
-        font-size: 0.85rem;
-        font-weight: 500;
-        transition: all 0.2s ease;
       }
-
-      .graph-tabs .tab:hover {
-        color: white;
-      }
-
-      /* Active State (Purple Glow) */
       .graph-tabs .tab.active {
-        background: #e392fa; /* Brand Purple */
+        background: var(--accent-purple);
         color: black;
         font-weight: 700;
-      }
-      .trends-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end; /* 👈 KEY LINE */
-        margin-bottom: 15px;
-      }
-
-      .trends-header h2 {
-        margin-bottom: 0; /* Remove default gap */
-      }
-
-      #minMaxDisplay {
-        margin-bottom: 4px; /* Fine-tune vertical drop */
-      }
-
-      .graph-tabs {
-        margin-bottom: -5px; /* Fine-tune tabs position */
       }
     </style>
   </head>
@@ -455,7 +351,6 @@ Core Principles:
           <div id="server-display" style="display: none">
             <span id="serverUrlSpan"></span>
           </div>
-
           <div class="server-input-group" id="server-edit">
             <input
               type="text"
@@ -470,11 +365,9 @@ Core Principles:
               placeholder="port"
             />
           </div>
-
           <button id="serverSubmitBtn">Set</button>
         </div>
       </div>
-
       <a
         href="https://github.com/jturner297/CoolCoinDepinNetwork.git"
         target="_blank"
@@ -491,55 +384,54 @@ Core Principles:
     <div class="layout">
       <aside>
         <h3>Nodes</h3>
-
-        <!-- Node input stays at top -->
         <div class="node-card node-input-card">
           <input
             type="text"
             class="node-input"
             id="nodeInput"
-            placeholder="Type Node ID or Nickname"
+            placeholder="Add Node (ID or Nickname)"
           />
         </div>
+        <div id="node-list"></div>
 
-        <!-- Node list container -->
-        <div id="node-list">
-          <!-- Dynamically added nodes will go here -->
+        <h3 class="wallet-header">Wallets</h3>
+        <div class="node-card node-input-card">
+          <input
+            type="text"
+            class="node-input"
+            id="walletInput"
+            placeholder="Add Wallet Public Key"
+          />
         </div>
+        <div id="wallet-list"></div>
       </aside>
 
       <main>
-        <section>
-          <h2>Live Environmental Statistics</h2>
-          <div class="stat-card">
-            <span class="stat-label">Temperature</span>
-            <span class="stat-value" id="tempDisplay">-- °C</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Pressure</span>
-            <span class="stat-value" id="presDisplay">-- hpa</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Humidity</span>
-            <span class="stat-value" id="humDisplay">-- %</span>
+        <div id="node-view" class="view-section">
+          <h2 style="color: var(--accent-purple)">Environmental Stats</h2>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="stat-label">Temperature</span>
+              <span class="stat-value" id="tempDisplay">-- °C</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Pressure</span>
+              <span class="stat-value" id="presDisplay">-- hPa</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Humidity</span>
+              <span class="stat-value" id="humDisplay">-- %</span>
+            </div>
           </div>
 
-          <h2>Check Wallet Balance</h2>
-          <div class="wallet-card">
-            <input
-              type="text"
-              class="wallet-input"
-              placeholder="Paste public key to track wallet"
-            />
-          </div>
-        </section>
-
-        <section>
           <div class="trends-header">
-            <h2>Trends</h2>
+            <h2>Activity Trends</h2>
             <div
-              id="minMaxDisplay"
-              style="font-size: 0.8rem; color: var(--text-dim)"
+              style="
+                font-size: 0.8rem;
+                color: var(--text-dim);
+                margin-bottom: 5px;
+              "
             >
               High:
               <span
@@ -558,44 +450,65 @@ Core Principles:
               </button>
               <button class="tab" onclick="setGraphMode('pres')">
                 Pressure
-                <button class="tab" onclick="setGraphMode('hum')">
-                  Humidity
-                </button>
+              </button>
+              <button class="tab" onclick="setGraphMode('hum')">
+                Humidity
               </button>
             </div>
           </div>
 
-          <div
-            class="graph-container"
-            style="position: relative; height: 300px; width: 100%"
-          >
+          <div style="position: relative; height: 300px; width: 100%">
             <canvas id="trendChart"></canvas>
           </div>
+          <div class="details-text" id="node-details"></div>
+        </div>
 
-          <div class="details-text"></div>
-        </section>
+        <div id="wallet-view" class="view-section">
+          <h2 style="color: var(--accent-blue)">Financial Stats</h2>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="stat-label">Confirmed Balance</span>
+              <span class="stat-value wallet-val" id="walletConfirmed">--</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Pending (Mined)</span>
+              <span class="stat-value wallet-val" id="walletPending">--</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Total Balance</span>
+              <span class="stat-value wallet-val" id="walletTotal">--</span>
+            </div>
+          </div>
+
+          <h2 style="color: var(--accent-blue)">Transaction History</h2>
+          <div class="tx-history-container" id="txHistory">
+            <div style="text-align: center; color: #666; margin-top: 50px">
+              Select a wallet to view transactions
+            </div>
+          </div>
+          <div class="details-text" id="wallet-details-text"></div>
+        </div>
       </main>
     </div>
+
     <script>
-      // ==========================================
-      // GLOBAL STATE
-      // ==========================================
+      // ================= Global State =================
       let SERVER_URL = null;
       let isEditing = true;
-      const MAX_NODES = 3;
+      const MAX_ITEMS = 3; // <--- STRICT LIMIT OF 3
 
       let trackedNodes = [];
+      let trackedWallets = [];
       let nodeNameCache = {};
 
-      // NEW: Heartbeat System
-      // Stores the timestamp (Browser Time) of the last time we saw FRESH data for a node
-      let lastHeartbeat = {}; // { "nodeKey": 170000000000 }
-      let lastKnownSig = {}; // { "nodeKey": "signature_string..." }
+      let activeType = null;
+      let activeIndex = null;
 
-      let activeNode = null;
       let cachedChartData = [];
       let myChart = null;
       let currentMode = "temp";
+      let lastHeartbeat = {};
+      let lastKnownSig = {};
 
       const MODES = {
         temp: {
@@ -617,16 +530,13 @@ Core Principles:
           unit: "hPa",
         },
       };
-
       const Y_SCALES = {
         temp: { buffer: 2, step: 1 },
         hum: { buffer: 15, step: 10 },
         pres: { buffer: 4, step: 5 },
       };
 
-      // ==========================================
-      // HELPER UTILITIES
-      // ==========================================
+      // ================= Helper Utilities =================
       function cleanKey(key) {
         if (!key) return "";
         return key
@@ -645,156 +555,438 @@ Core Principles:
         return gradient;
       }
 
-      // ==========================================
-      // UI: SERVER CONFIGURATION
-      // ==========================================
-      const serverEditDiv = document.getElementById("server-edit");
-      const serverDisplayDiv = document.getElementById("server-display");
-      const serverUrlSpan = document.getElementById("serverUrlSpan");
+      // ================= UI: Server Config =================
       const serverBtn = document.getElementById("serverSubmitBtn");
-
       serverBtn.addEventListener("click", () => {
+        const editDiv = document.getElementById("server-edit");
+        const dispDiv = document.getElementById("server-display");
         if (isEditing) {
-          const address = document.getElementById("serverAddress").value.trim();
+          const addr = document.getElementById("serverAddress").value.trim();
           const port = document.getElementById("serverPort").value.trim();
-          if (!address || !port) return;
-          SERVER_URL = `http://${address}:${port}`;
-          serverUrlSpan.textContent = SERVER_URL;
-          serverEditDiv.style.display = "none";
-          serverDisplayDiv.style.display = "flex";
+          if (!addr || !port) return;
+          SERVER_URL = `http://${addr}:${port}`;
+          document.getElementById("serverUrlSpan").textContent = SERVER_URL;
+          editDiv.style.display = "none";
+          dispDiv.style.display = "flex";
           serverBtn.textContent = "Edit";
           isEditing = false;
-          // Trigger immediate fetch
-          updateActiveNodeStats();
+          refreshData();
         } else {
-          const [addr, prt] = SERVER_URL.replace("http://", "").split(":");
-          document.getElementById("serverAddress").value = addr || "";
-          document.getElementById("serverPort").value = prt || "";
-          serverDisplayDiv.style.display = "none";
-          serverEditDiv.style.display = "flex";
+          const [a, p] = SERVER_URL.replace("http://", "").split(":");
+          document.getElementById("serverAddress").value = a || "";
+          document.getElementById("serverPort").value = p || "";
+          dispDiv.style.display = "none";
+          editDiv.style.display = "flex";
           serverBtn.textContent = "Set";
           isEditing = true;
         }
       });
 
-      // ==========================================
-      // UI: NODE MANAGEMENT
-      // ==========================================
+      // ================= UI: Sidebar Management =================
       const nodeList = document.getElementById("node-list");
+      const walletList = document.getElementById("wallet-list");
       const nodeInput = document.getElementById("nodeInput");
+      const walletInput = document.getElementById("walletInput");
 
-      function renderNodes() {
+      function renderSidebar() {
+        // --- VISUAL LIMIT LOGIC FOR NODES ---
+        if (trackedNodes.length >= MAX_ITEMS) {
+          nodeInput.disabled = true;
+          nodeInput.placeholder = "Max limit reached";
+          nodeInput.parentElement.style.opacity = "0.5";
+          nodeInput.parentElement.style.pointerEvents = "none";
+        } else {
+          nodeInput.disabled = false;
+          nodeInput.placeholder = "Add Node (ID or Nickname)";
+          nodeInput.parentElement.style.opacity = "1";
+          nodeInput.parentElement.style.pointerEvents = "auto";
+        }
+
+        // Render Nodes
         nodeList.innerHTML = "";
         trackedNodes.forEach((key, idx) => {
           const card = document.createElement("div");
-          card.className = "node-card";
-          if (activeNode === idx) card.style.outline = "2px solid #e392fa";
-
-          const spanName = document.createElement("span");
-          const friendlyName = nodeNameCache[key]
-            ? nodeNameCache[key]
-            : key.substring(0, 12) + "...";
-          spanName.textContent = friendlyName;
-
-          const trash = document.createElement("span");
-          trash.textContent = "✕";
-          trash.style.cursor = "pointer";
-          trash.onclick = (e) => {
+          card.className =
+            "node-card" +
+            (activeType === "NODE" && activeIndex === idx
+              ? " active-node"
+              : "");
+          const nameSpan = document.createElement("span");
+          nameSpan.textContent =
+            nodeNameCache[key] || key.substring(0, 12) + "...";
+          const delSpan = document.createElement("span");
+          delSpan.textContent = "✕";
+          delSpan.onclick = (e) => {
             e.stopPropagation();
-            trackedNodes.splice(idx, 1);
-            if (activeNode === idx) {
-              activeNode = null;
-              resetStats("EMPTY");
-            } else if (activeNode > idx) {
-              activeNode--;
-            }
-            renderNodes();
+            removeNode(idx);
           };
-
-          card.appendChild(spanName);
-          card.appendChild(trash);
-          card.onclick = () => {
-            activeNode = idx;
-            renderNodes();
-            updateActiveNodeStats();
-          };
+          card.appendChild(nameSpan);
+          card.appendChild(delSpan);
+          card.onclick = () => selectItem("NODE", idx);
           nodeList.appendChild(card);
         });
 
-        if (trackedNodes.length >= MAX_NODES) {
-          nodeInput.disabled = true;
-          nodeInput.placeholder = "Max nodes reached";
+        // --- VISUAL LIMIT LOGIC FOR WALLETS ---
+        if (trackedWallets.length >= MAX_ITEMS) {
+          walletInput.disabled = true;
+          walletInput.placeholder = "Max limit reached";
+          walletInput.parentElement.style.opacity = "0.5";
+          walletInput.parentElement.style.pointerEvents = "none";
         } else {
-          nodeInput.disabled = false;
-          nodeInput.placeholder = "Type Node ID or Nickname";
+          walletInput.disabled = false;
+          walletInput.placeholder = "Add Wallet Public Key";
+          walletInput.parentElement.style.opacity = "1";
+          walletInput.parentElement.style.pointerEvents = "auto";
         }
+
+        // Render Wallets
+        walletList.innerHTML = "";
+        trackedWallets.forEach((key, idx) => {
+          const card = document.createElement("div");
+          card.className =
+            "node-card" +
+            (activeType === "WALLET" && activeIndex === idx
+              ? " active-wallet"
+              : "");
+          const nameSpan = document.createElement("span");
+          nameSpan.textContent =
+            "Wallet " + (idx + 1) + ": " + key.substring(0, 8) + "...";
+          const delSpan = document.createElement("span");
+          delSpan.textContent = "✕";
+          delSpan.onclick = (e) => {
+            e.stopPropagation();
+            removeWallet(idx);
+          };
+          card.appendChild(nameSpan);
+          card.appendChild(delSpan);
+          card.onclick = () => selectItem("WALLET", idx);
+          walletList.appendChild(card);
+        });
+      }
+
+      function selectItem(type, index) {
+        activeType = type;
+        activeIndex = index;
+        document.getElementById("node-view").classList.remove("active");
+        document.getElementById("wallet-view").classList.remove("active");
+
+        if (type === "NODE") {
+          document.getElementById("node-view").classList.add("active");
+          if (myChart) setTimeout(() => myChart.resize(), 100);
+        } else {
+          document.getElementById("wallet-view").classList.add("active");
+        }
+        renderSidebar();
+        refreshData();
+      }
+
+      function clearMainView() {
+        activeType = null;
+        activeIndex = null;
+        document.getElementById("node-view").classList.remove("active");
+        document.getElementById("wallet-view").classList.remove("active");
+      }
+
+      function removeNode(idx) {
+        if (activeType === "NODE" && activeIndex === idx) {
+          clearMainView();
+        } else if (activeType === "NODE" && activeIndex > idx) {
+          activeIndex--;
+        }
+        trackedNodes.splice(idx, 1);
+        renderSidebar();
+      }
+
+      function removeWallet(idx) {
+        if (activeType === "WALLET" && activeIndex === idx) {
+          clearMainView();
+        } else if (activeType === "WALLET" && activeIndex > idx) {
+          activeIndex--;
+        }
+        trackedWallets.splice(idx, 1);
+        renderSidebar();
       }
 
       nodeInput.addEventListener("keydown", async (e) => {
         if (e.key === "Enter") {
-          const val = nodeInput.value.trim();
+          // LIMIT CHECK (Should be blocked by UI but double check)
+          if (trackedNodes.length >= MAX_ITEMS) return;
+
+          let val = nodeInput.value.trim();
           if (!val) return;
-          if (trackedNodes.length >= MAX_NODES) return;
-
-          nodeInput.disabled = true;
-          nodeInput.placeholder = "Searching...";
-
-          let finalKey = val;
           if (SERVER_URL) {
             try {
-              const res = await fetch(
+              const r = await fetch(
                 `${SERVER_URL}/resolve_nickname/${encodeURIComponent(val)}`,
               );
-              if (res.ok) {
-                const data = await res.json();
-                if (data.status === "found") {
-                  finalKey = data.pubkey;
-                  nodeNameCache[finalKey] = data.nickname;
-                }
+              const d = await r.json();
+              if (d.status === "found") {
+                val = d.pubkey;
+                nodeNameCache[val] = d.nickname;
               }
-            } catch (err) {
-              console.warn("Nickname resolve failed");
-            }
+            } catch (e) {}
           }
-
-          if (trackedNodes.includes(finalKey)) {
-            alert("Node is already on the dashboard.");
-          } else {
-            trackedNodes.push(finalKey);
-            activeNode = trackedNodes.length - 1;
-            renderNodes();
-            updateActiveNodeStats();
+          if (!trackedNodes.includes(val)) {
+            trackedNodes.push(val);
+            selectItem("NODE", trackedNodes.length - 1);
           }
-
           nodeInput.value = "";
-          nodeInput.disabled = false;
-          nodeInput.placeholder = "Type Node ID or Nickname";
-          nodeInput.focus();
         }
       });
 
-      // ==========================================
-      // CHART ENGINE
-      // ==========================================
+      walletInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          if (trackedWallets.length >= MAX_ITEMS) return;
+
+          const val = walletInput.value.trim();
+          if (!val) return;
+          if (!trackedWallets.includes(val)) {
+            trackedWallets.push(val);
+            selectItem("WALLET", trackedWallets.length - 1);
+          }
+          walletInput.value = "";
+        }
+      });
+
+      // ================= DATA LOGIC =================
+      async function refreshData() {
+        if (!SERVER_URL || activeType === null) return; // Don't fetch if on default view
+        const t = Date.now();
+        try {
+          const [chainRes, mempoolRes] = await Promise.all([
+            fetch(`${SERVER_URL}/chain?t=${t}`),
+            fetch(`${SERVER_URL}/mempool?t=${t}`),
+          ]);
+          if (!chainRes.ok || !mempoolRes.ok) throw new Error("API Error");
+          const chain = await chainRes.json();
+          const mempool = await mempoolRes.json();
+          const serverDate = new Date(
+            chainRes.headers.get("Date") || Date.now(),
+          );
+
+          if (activeType === "NODE")
+            updateNodeStats(chain, mempool, serverDate);
+          else if (activeType === "WALLET") updateWalletStats(chain, mempool);
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      async function updateNodeStats(chain, mempool, serverNow) {
+        if (activeIndex === null || !trackedNodes[activeIndex]) return;
+        const currentNodeRaw = trackedNodes[activeIndex];
+        const cleanID = cleanKey(currentNodeRaw);
+
+        fetch(
+          `${SERVER_URL}/node_nickname/${encodeURIComponent(cleanID)}?t=${Date.now()}`,
+        )
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.status === "found")
+              nodeNameCache[currentNodeRaw] = d.nickname;
+            renderSidebar();
+          })
+          .catch((e) => {});
+
+        let rawHistory = [];
+        const processTx = (tx, isMempool) => {
+          if (
+            tx.type === "MINT" &&
+            cleanKey(tx.from_addr) === cleanID &&
+            tx.reading
+          ) {
+            const cleanTime = tx.timestamp
+              .replace(" UTC", "")
+              .trim()
+              .replace(/-/g, "/");
+            const dt = new Date(cleanTime + " UTC");
+            if (!isNaN(dt.getTime())) {
+              rawHistory.push({
+                timeObj: dt,
+                temp: tx.reading.temperature,
+                pres: tx.reading.pressure,
+                hum: tx.reading.humidity,
+                isPending: isMempool,
+                signature: tx.signature,
+              });
+            }
+          }
+        };
+        chain.forEach((b) =>
+          b.transactions.forEach((tx) => processTx(tx, false)),
+        );
+        mempool.forEach((tx) => processTx(tx, true));
+        rawHistory.sort((a, b) => a.timeObj - b.timeObj);
+
+        let smoothHistory = [];
+        let totalActiveMs = 0;
+        let lastTime = 0;
+        const IDLE_CUTOFF = 20000;
+
+        if (rawHistory.length > 0) {
+          smoothHistory.push(rawHistory[0]);
+          lastTime = rawHistory[0].timeObj.getTime();
+          for (let i = 1; i < rawHistory.length; i++) {
+            const p = rawHistory[i];
+            const diff = p.timeObj.getTime() - lastTime;
+            if (diff < IDLE_CUTOFF && diff > 0) totalActiveMs += diff;
+            if (diff > 60000)
+              smoothHistory.push({
+                timeObj: p.timeObj,
+                temp: null,
+                pres: null,
+                hum: null,
+              });
+            if (diff >= 1000) {
+              smoothHistory.push(p);
+              lastTime = p.timeObj.getTime();
+            }
+          }
+        }
+        cachedChartData = smoothHistory.slice(-60);
+
+        const latest = rawHistory[rawHistory.length - 1];
+        let status = "OFFLINE";
+        if (latest) {
+          if (lastKnownSig[cleanID] !== latest.signature) {
+            lastKnownSig[cleanID] = latest.signature;
+            lastHeartbeat[cleanID] = Date.now();
+          }
+          const msSince = Date.now() - (lastHeartbeat[cleanID] || 0);
+          if (latest.isPending) {
+            status = "ONLINE";
+            lastHeartbeat[cleanID] = Date.now();
+          } else if (msSince < 60000)
+            status = msSince < 20000 ? "ONLINE" : "IDLE";
+          else {
+            const sDiff = (serverNow - latest.timeObj) / 1000;
+            if (sDiff < 25) status = "ONLINE";
+            else if (sDiff < 60) status = "IDLE";
+          }
+        }
+
+        if (latest && status !== "OFFLINE") {
+          document.getElementById("tempDisplay").textContent =
+            latest.temp.toFixed(2) + " °C";
+          document.getElementById("presDisplay").textContent =
+            latest.pres.toFixed(2) + " hPa";
+          document.getElementById("humDisplay").textContent =
+            latest.hum.toFixed(2) + " %";
+          renderChartFromCache();
+        } else {
+          resetTopStats("--");
+        }
+
+        const mins = Math.floor(totalActiveMs / 60000);
+        const secs = Math.floor((totalActiveMs % 60000) / 1000);
+        const cName = nodeNameCache[currentNodeRaw] || "unknown";
+        const cId = cleanKey(currentNodeRaw);
+        let statusHtml =
+          status === "ONLINE"
+            ? `<span class="detail-val-green">Online</span>`
+            : status === "IDLE"
+              ? `<span class="detail-val-yellow">Idle</span>`
+              : `<span class="detail-val-red">Offline</span>`;
+
+        document.getElementById("node-details").innerHTML = `
+           <h3 class="details-header">Details</h3>
+           <div class="detail-row"><span class="detail-label">Node name:</span><span class="detail-val-purple">${cName}</span></div>
+           <div class="detail-row"><span class="detail-label">Node ID:</span><span class="detail-val-white">${cId}</span></div>
+           <div class="detail-row"><span class="detail-label">Status:</span>${statusHtml}</div>
+           <div class="detail-row"><span class="detail-label">Active Time:</span><span class="detail-val-white">${mins}m ${secs}s</span></div>
+        `;
+      }
+
+      function updateWalletStats(chain, mempool) {
+        if (activeIndex === null || !trackedWallets[activeIndex]) return;
+        const currentWallet = cleanKey(trackedWallets[activeIndex]);
+
+        let confirmed = 0;
+        let pending = 0;
+        let txList = [];
+        const scanTx = (tx, isMem) => {
+          const from = cleanKey(tx.from_addr);
+          const to = cleanKey(tx.to_addr);
+          if (from !== currentWallet && to !== currentWallet) return;
+          let amount = tx.amount;
+          let type = tx.type;
+          if (isMem) {
+            if (type === "MINT" && to === currentWallet) pending += amount;
+            if (type === "TRANSFER") {
+              if (to === currentWallet) pending += amount;
+              if (from === currentWallet) pending -= amount;
+            }
+          } else {
+            if (type === "MINT" && to === currentWallet) confirmed += amount;
+            if (type === "TRANSFER") {
+              if (to === currentWallet) confirmed += amount;
+              if (from === currentWallet) confirmed -= amount;
+            }
+          }
+          txList.push({
+            time: tx.timestamp,
+            type: type,
+            amount: amount,
+            isInbound: to === currentWallet,
+            isMem: isMem,
+          });
+        };
+
+        chain.forEach((b) => b.transactions.forEach((tx) => scanTx(tx, false)));
+        mempool.forEach((tx) => scanTx(tx, true));
+
+        document.getElementById("walletConfirmed").textContent =
+          confirmed.toFixed(2);
+        document.getElementById("walletPending").textContent =
+          pending.toFixed(2);
+        document.getElementById("walletTotal").textContent = (
+          confirmed + pending
+        ).toFixed(2);
+
+        const listDiv = document.getElementById("txHistory");
+        listDiv.innerHTML = "";
+        if (txList.length === 0) {
+          listDiv.innerHTML =
+            '<div style="text-align: center; color: #666; margin-top: 50px;">No transactions found</div>';
+        } else {
+          txList.reverse().forEach((tx) => {
+            const row = document.createElement("div");
+            row.className = "tx-row";
+            const typeSpan = `<span class="${tx.type === "MINT" ? "tx-type-mint" : "tx-type-transfer"}">${tx.type}</span>`;
+            const sign = tx.isInbound ? "+" : "-";
+            const color = tx.isInbound ? "#00ff55" : "#ff0059";
+            row.innerHTML = `
+                  <div style="display:flex; flex-direction:column; gap:2px;">
+                     ${typeSpan}
+                     <span class="tx-time">${tx.time} ${tx.isMem ? "(Pending)" : ""}</span>
+                  </div>
+                  <div class="tx-amount" style="color: ${color}">${sign}${tx.amount.toFixed(2)}</div>
+                `;
+            listDiv.appendChild(row);
+          });
+        }
+        document.getElementById("wallet-details-text").innerHTML = `
+           <h3 class="details-header" style="color: var(--accent-blue)">Details</h3>
+           <div class="detail-row"><span class="detail-label">Wallet ID:</span><span class="detail-val-white">${currentWallet}</span></div>
+           <div class="detail-row"><span class="detail-label">Total Tx:</span><span class="detail-val-blue">${txList.length}</span></div>
+         `;
+      }
+
+      // ================= CHART LOGIC =================
       function initChart() {
         const ctx = document.getElementById("trendChart").getContext("2d");
-        const config = MODES[currentMode];
         myChart = new Chart(ctx, {
           type: "line",
           data: {
             labels: [],
             datasets: [
               {
-                label: config.label,
+                label: "Temp",
                 data: [],
-                borderColor: config.color,
-                backgroundColor: config.gradient
-                  ? createGradient(ctx, config.color)
-                  : config.color,
-                borderWidth: 2,
+                borderColor: "#e392fa",
                 tension: 0.3,
+                borderWidth: 2,
                 pointRadius: 2,
-                fill: config.gradient,
               },
             ],
           },
@@ -802,47 +994,22 @@ Core Principles:
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: {
-              x: {
-                grid: { display: false },
-                ticks: { color: "#666", maxTicksLimit: 6 },
-              },
-              y: {
-                grid: { color: "rgba(255, 255, 255, 0.05)" },
-                ticks: { color: "#ccc" },
-              },
-            },
+            scales: { x: { display: false }, y: { grid: { color: "#333" } } },
           },
         });
       }
-
       function setGraphMode(mode) {
-        if (currentMode === mode) return;
         currentMode = mode;
-        const config = MODES[mode];
-        const dataset = myChart.data.datasets[0];
-        const yScale = myChart.options.scales.y;
-
-        document.querySelectorAll(".graph-tabs .tab").forEach((btn) => {
-          btn.classList.remove("active");
-          if (
-            btn.textContent
-              .toLowerCase()
-              .includes(
-                mode === "pres"
-                  ? "pressure"
-                  : mode === "hum"
-                    ? "humidity"
-                    : "temp",
-              )
-          )
-            btn.classList.add("active");
+        document.querySelectorAll(".tab").forEach((b) => {
+          b.classList.remove("active");
+          if (b.textContent.toLowerCase().includes(mode.substring(0, 3)))
+            b.classList.add("active");
         });
 
-        dataset.label = config.label;
+        const config = MODES[mode];
+        const dataset = myChart.data.datasets[0];
         dataset.borderColor = config.color;
         dataset.pointBackgroundColor = config.color;
-
         if (config.gradient) {
           dataset.fill = true;
           dataset.backgroundColor = createGradient(
@@ -854,325 +1021,37 @@ Core Principles:
           dataset.backgroundColor = config.color;
         }
 
-        if (mode === "pres") {
-          delete yScale.min;
-          delete yScale.max;
-          delete yScale.stepSize;
-        } else {
-          yScale.min = Y_SCALES[mode].min;
-          yScale.max = Y_SCALES[mode].max;
-          yScale.ticks.stepSize = Y_SCALES[mode].step;
-        }
         renderChartFromCache();
       }
-
       function renderChartFromCache() {
         if (!myChart || cachedChartData.length === 0) return;
-
-        // Get the raw data (includes nulls for gaps)
         const plotData = cachedChartData.map((h) => h[currentMode]);
-        const labels = cachedChartData.map((h) =>
+        const valid = plotData.filter((v) => v !== null);
+        const min = Math.min(...valid);
+        const max = Math.max(...valid);
+        const cfg = Y_SCALES[currentMode];
+
+        if (valid.length > 0) {
+          myChart.options.scales.y.min = Math.floor(min - cfg.buffer);
+          myChart.options.scales.y.max = Math.ceil(max + cfg.buffer);
+
+          // --- FIX: ADDED UNITS HERE ---
+          const unit = MODES[currentMode].unit;
+          document.getElementById("highVal").textContent =
+            `${Math.max(...valid).toFixed(1)} ${unit}`;
+          document.getElementById("lowVal").textContent =
+            `${Math.min(...valid).toFixed(1)} ${unit}`;
+        }
+        myChart.data.labels = cachedChartData.map((h) =>
           h.timeObj.toLocaleTimeString(),
         );
-
-        // --- THE FIX: Create a clean list of ONLY numbers ---
-        // This removes the 'null' gaps so Math.min doesn't see them as 0.
-        const validValues = plotData.filter((v) => v !== null && !isNaN(v));
-        // ---------------------------------------------------
-
-        if (validValues.length > 0) {
-          const dataMin = Math.min(...validValues); // Use validValues, not plotData
-          const dataMax = Math.max(...validValues);
-          const config = Y_SCALES[currentMode];
-
-          let dynamicMin = Math.floor(dataMin - config.buffer);
-          let dynamicMax = Math.ceil(dataMax + config.buffer);
-
-          myChart.options.scales.y.min = dynamicMin;
-          myChart.options.scales.y.max = dynamicMax;
-          if (config.step)
-            myChart.options.scales.y.ticks.stepSize = config.step;
-        }
-
-        myChart.data.labels = labels;
-        myChart.data.datasets[0].data = plotData; // We still plot 'plotData' so the visual gap remains
-
-        if (validValues.length > 0) {
-          const high = Math.max(...validValues);
-          const low = Math.min(...validValues);
-          const unit = MODES[currentMode].unit;
-
-          document.getElementById("highVal").textContent =
-            `${high.toFixed(1)}${unit}`;
-          document.getElementById("lowVal").textContent =
-            `${low.toFixed(1)}${unit}`;
-        }
+        myChart.data.datasets[0].data = plotData;
         myChart.update();
       }
-
-      function renderDetailsPanel(state, data) {
-        const container = document.querySelector(".details-text");
-        if (state === "EMPTY") {
-          container.innerHTML = "";
-          return;
-        }
-
-        const { id, lastSync, windowTxt, nodeName } = data;
-        let nameHtml, statusHtml, syncHtml, windowHtml;
-
-        if (!nodeName || nodeName.toLowerCase() === "unknown") {
-          nameHtml = `<span class="detail-val-red">unknown</span>`;
-        } else {
-          nameHtml = `<span class="detail-val-purple">${nodeName}</span>`;
-        }
-
-        if (state === "OFFLINE") {
-          statusHtml = `<span class="detail-val-red">Offline</span>`;
-          syncHtml = `<span class="detail-val-white">${lastSync || "N/A"}</span>`;
-          windowHtml = `<span class="detail-val-white">N/A</span>`;
-        } else if (state === "IDLE") {
-          statusHtml = `<span class="detail-val-yellow">Idle (Lagging)</span>`;
-          syncHtml = `<span class="detail-val-white">${lastSync}</span>`;
-          windowHtml = `<span class="detail-val-white">${windowTxt}</span>`;
-        } else {
-          statusHtml = `<span class="detail-val-green">Online</span>`;
-          syncHtml = `<span class="detail-val-white">${lastSync}</span>`;
-          windowHtml = `<span class="detail-val-white">${windowTxt}</span>`;
-        }
-
-        const fullCleanID = cleanKey(id);
-        const shortID =
-          fullCleanID.length > 20
-            ? fullCleanID.substring(0, 12) + "..."
-            : fullCleanID;
-
-        container.innerHTML = `
-          <h3 class="details-header">Details</h3>
-          <div class="detail-row"><span class="detail-label">Node name:</span>${nameHtml}</div>
-          <div class="detail-row">
-            <span class="detail-label">Node ID:</span>
-            <span class="detail-val-white" title="${fullCleanID}" style="cursor: help;">${shortID}</span>
-          </div>
-          <div class="detail-row"><span class="detail-label">Status:</span>${statusHtml}</div>
-          <div class="detail-row"><span class="detail-label">Last sync:</span>${syncHtml}</div>
-          <div class="detail-row"><span class="detail-label">Uptime:</span>${windowHtml}</div>
-        `;
-      }
-
-      // ==========================================
-      // MAIN DATA LOOP
-      // ==========================================
-      async function updateActiveNodeStats() {
-        if (!SERVER_URL) return;
-
-        if (activeNode === null || !trackedNodes[activeNode]) {
-          resetStats("EMPTY");
-          return;
-        }
-
-        const currentNodeRaw = trackedNodes[activeNode];
-        const cleanID = cleanKey(currentNodeRaw);
-        const t = Date.now(); // Cache Busting
-
-        try {
-          // 1. Fetch Data
-          const [chainRes, mempoolRes] = await Promise.all([
-            fetch(`${SERVER_URL}/chain?t=${t}`),
-            fetch(`${SERVER_URL}/mempool?t=${t}`),
-          ]);
-
-          if (!chainRes.ok || !mempoolRes.ok) throw new Error("API Error");
-
-          // Server Time for fallback
-          const serverHeaderTime = chainRes.headers.get("Date");
-          const serverNow = serverHeaderTime
-            ? new Date(serverHeaderTime)
-            : new Date();
-
-          const chain = await chainRes.json();
-          const mempool = await mempoolRes.json();
-
-          // 2. Nickname (Non-blocking)
-          fetch(
-            `${SERVER_URL}/node_nickname/${encodeURIComponent(cleanID)}?t=${t}`,
-          )
-            .then((r) => r.json())
-            .then((data) => {
-              if (data.status === "found") {
-                nodeNameCache[currentNodeRaw] = data.nickname;
-                const card =
-                  document.querySelectorAll(".node-card span")[activeNode];
-                if (card && card.textContent !== data.nickname) renderNodes();
-              }
-            })
-            .catch((e) => {});
-
-          if (
-            activeNode === null ||
-            trackedNodes[activeNode] !== currentNodeRaw
-          )
-            return;
-
-          // 3. Process History
-          let rawHistory = [];
-          const processTx = (tx, isMempool) => {
-            if (
-              tx.type === "MINT" &&
-              cleanKey(tx.from_addr) === cleanID &&
-              tx.reading
-            ) {
-              try {
-                const cleanTimeStr = tx.timestamp.replace(" UTC", "").trim();
-                const [dPart, tPart] = cleanTimeStr.split(" ");
-                const [mm, dd, yyyy] = dPart.split("-");
-                const [hh, min, ss] = tPart.split(":");
-                const txDateObj = new Date(
-                  Date.UTC(yyyy, mm - 1, dd, hh, min, ss),
-                );
-
-                if (!isNaN(txDateObj.getTime())) {
-                  rawHistory.push({
-                    timeObj: txDateObj,
-                    timeStr: tx.timestamp,
-                    temp: tx.reading.temperature,
-                    pres: tx.reading.pressure,
-                    hum: tx.reading.humidity,
-                    isPending: isMempool,
-                    signature: tx.signature, // <--- Crucial for Heartbeat
-                  });
-                }
-              } catch (e) {}
-            }
-          };
-
-          chain.forEach((b) =>
-            b.transactions.forEach((tx) => processTx(tx, false)),
-          );
-          mempool.forEach((tx) => processTx(tx, true));
-          rawHistory.sort((a, b) => a.timeObj - b.timeObj);
-
-          // 4. Graph Data Calculation
-          let smoothHistory = [];
-          let totalActiveMs = 0;
-          let lastTime = 0;
-
-          const IDLE_CUTOFF = 20000;
-
-          if (rawHistory.length > 0) {
-            smoothHistory.push(rawHistory[0]);
-            lastTime = rawHistory[0].timeObj.getTime();
-            for (let i = 1; i < rawHistory.length; i++) {
-              const point = rawHistory[i];
-              const pTime = point.timeObj.getTime();
-              const diff = pTime - lastTime;
-              if (diff < IDLE_CUTOFF && diff > 0) totalActiveMs += diff;
-              if (diff > 60000)
-                smoothHistory.push({
-                  timeObj: point.timeObj,
-                  temp: null,
-                  pres: null,
-                  hum: null,
-                });
-              if (diff >= 1000) {
-                smoothHistory.push(point);
-                lastTime = pTime;
-              }
-            }
-          }
-          cachedChartData = smoothHistory.slice(-60);
-
-          // 5. Time Window Text
-          const days = Math.floor(totalActiveMs / 86400000);
-          const hours = Math.floor((totalActiveMs % 86400000) / 3600000);
-          const mins = Math.floor((totalActiveMs % 3600000) / 60000);
-          const secs = Math.floor((totalActiveMs % 60000) / 1000); // <--- Calculate seconds
-
-          let windowTxt = "";
-
-          if (days > 0) {
-            windowTxt = `${days}d ${hours}h ${mins}m`;
-          } else if (hours > 0) {
-            windowTxt = `${hours}h ${mins}m ${secs}s`;
-          } else {
-            // For less than an hour, show minutes AND seconds
-            windowTxt = `${mins}m ${secs}s`;
-          }
-
-          // 6. ROBUST STATUS LOGIC (HEARTBEAT)
-          const latestReal = rawHistory[rawHistory.length - 1];
-          let nodeStatus = "OFFLINE";
-
-          if (latestReal) {
-            // A. HEARTBEAT CHECK
-            // If we see a signature we haven't seen before, the node is ALIVE.
-            // We update our local 'lastHeartbeat' timestamp to NOW.
-            if (lastKnownSig[cleanID] !== latestReal.signature) {
-              lastKnownSig[cleanID] = latestReal.signature;
-              lastHeartbeat[cleanID] = Date.now();
-            }
-
-            // B. Determine Status based on Heartbeat
-            const lastBeat = lastHeartbeat[cleanID] || 0;
-            const msSinceBeat = Date.now() - lastBeat;
-
-            if (latestReal.isPending) {
-              nodeStatus = "ONLINE";
-              // Keep heartbeat fresh while pending
-              lastHeartbeat[cleanID] = Date.now();
-            }
-            // If we received new data within the last 60 seconds (Client Time)
-            else if (msSinceBeat < 60000) {
-              nodeStatus = msSinceBeat < 20000 ? "ONLINE" : "IDLE";
-            }
-            // Fallback: If this is the first load (no heartbeat yet), use Server Time
-            else {
-              const serverDiff = (serverNow - latestReal.timeObj) / 1000;
-              if (serverDiff < 25)
-                nodeStatus = "ONLINE"; // slightly lenient
-              else if (serverDiff < 60) nodeStatus = "IDLE";
-              else nodeStatus = "OFFLINE";
-            }
-          }
-
-          // 7. Render
-          const currentName = nodeNameCache[currentNodeRaw] || "unknown";
-          if (latestReal && nodeStatus !== "OFFLINE") {
-            document.getElementById("tempDisplay").textContent =
-              `${latestReal.temp.toFixed(2)} °C`;
-            document.getElementById("presDisplay").textContent =
-              `${latestReal.pres.toFixed(2)} hPa`;
-            document.getElementById("humDisplay").textContent =
-              `${latestReal.hum.toFixed(2)} %`;
-            renderDetailsPanel(nodeStatus, {
-              id: currentNodeRaw,
-              lastSync: latestReal.timeObj.toLocaleTimeString(),
-              windowTxt,
-              nodeName: currentName,
-            });
-            renderChartFromCache();
-          } else {
-            let lastSeen = latestReal
-              ? latestReal.timeObj.toLocaleString()
-              : "Never";
-            resetTopStats("Offline");
-            renderDetailsPanel("OFFLINE", {
-              id: currentNodeRaw,
-              nodeName: currentName,
-              lastSync: lastSeen,
-            });
-          }
-        } catch (err) {
-          console.error("Sync Error:", err);
-          resetStats("OFFLINE");
-        }
-      }
-
       function resetTopStats(msg) {
         document.getElementById("tempDisplay").textContent = msg;
         document.getElementById("presDisplay").textContent = msg;
         document.getElementById("humDisplay").textContent = msg;
-        document.getElementById("highVal").textContent = "--";
-        document.getElementById("lowVal").textContent = "--";
         cachedChartData = [];
         if (myChart) {
           myChart.data.labels = [];
@@ -1181,31 +1060,12 @@ Core Principles:
         }
       }
 
-      function resetStats(mode) {
-        resetTopStats(mode === "EMPTY" ? "--" : "Offline");
-        if (mode === "EMPTY") renderDetailsPanel("EMPTY", {});
-        else {
-          const id =
-            activeNode !== null && trackedNodes[activeNode]
-              ? trackedNodes[activeNode]
-              : "Unknown";
-          renderDetailsPanel("OFFLINE", {
-            id: id,
-            nodeName: nodeNameCache[id] || "unknown",
-          });
-        }
-      }
-
-      // Start
+      // ================= STARTUP =================
       initChart();
       setGraphMode(currentMode);
-      renderNodes();
-
-      // RECURSIVE LOOP (Prevents network pile-up)
+      renderSidebar();
       function startLoop() {
-        updateActiveNodeStats().finally(() => {
-          setTimeout(startLoop, 2000);
-        });
+        refreshData().finally(() => setTimeout(startLoop, 1000));
       }
       startLoop();
     </script>
